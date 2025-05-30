@@ -398,11 +398,10 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physx.gpu_temp_buffer_capacity = 2**30
         self.sim.physx.gpu_heap_capacity = 2**30
         self.sim.physx.gpu_collision_stack_size = 2**30
+        self.sim.physx.enable_ccd = True
         self.rerender_on_reset = True
 
         # self.sim.render.enable_reflections = False
         # self.sim.render.enable_shadows = False
         # self.sim.render.enable_direct_lighting = False
         # self.sim.render.enable_ambient_occlusion = False
-
-

@@ -7,8 +7,8 @@ from openpi_client import websocket_client_policy, image_tools
 from .abstract_client import InferenceClient
 
 class Client(InferenceClient):
-    def __init__(self, 
-                remote_host:str = "localhost", 
+    def __init__(self,
+                remote_host:str = "localhost",
                 remote_port:int = 8000,
                 open_loop_horizon:int = 8,
                  ) -> None:
@@ -43,6 +43,8 @@ class Client(InferenceClient):
             self.actions_from_chunk_completed == 0
             or self.actions_from_chunk_completed >= self.open_loop_horizon
         ):
+
+            print(f"Calling inference: {curr_obs['joint_position']} {curr_obs['gripper_position']}")
             self.actions_from_chunk_completed = 0
             request_data = {
                 "observation/exterior_image_1_left": image_tools.resize_with_pad(
@@ -63,7 +65,7 @@ class Client(InferenceClient):
 
         # binarize gripper action
         if action[-1].item() > 0.5:
-            action = np.concatenate([action[:-1], np.ones((1,))])
+            action = np.concatenate([action[:-1], np.ones((1,))])* 0.785398 # 45 deg.
         else:
             action = np.concatenate([action[:-1], np.zeros((1,))])
 

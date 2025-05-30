@@ -13,7 +13,7 @@ from src.inference.droid_jointpos import Client as DroidJointPosClient
 
 def main(
         episodes = 10,
-        headless: bool = True,
+        headless: bool = False,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -50,6 +50,7 @@ def main(
         for ep in range(episodes):
             for step in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
                 ret = client.infer(obs, "put the banana in the bowl")
+                print(f"step: {step} action: {ret['action']}")
                 cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
                 cv2.waitKey(1)
                 video.append(ret["viz"])
