@@ -1,3 +1,23 @@
+"""
+Example script for running 10 rollouts of a DROID policy on the example environment.
+
+Usage:
+
+First, make sure you download the simulation assets and unpack them into the root directory of this package.
+
+Then, in a separate terminal, launch the policy server on localhost:8000 
+-- make sure to set XLA_PYTHON_CLIENT_MEM_FRACTION to avoid JAX hogging all the GPU memory.
+
+For example, to launch a pi0-FAST-DROID policy (with joint position control), 
+checkout openpi @ branch karl/droid_policies, and then run, in a separate terminal:
+
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 python3 scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
+
+Finally, run the evaluation script:
+
+python run_eval.py --episodes 10 --headless
+"""
+
 import tyro
 import argparse
 import gymnasium as gym
@@ -38,7 +58,7 @@ def main(
         use_fabric=True,
     )
     env = gym.make("DROID", cfg=env_cfg)
-    obs, info = env.reset()
+    obs, _ = env.reset()
     client = DroidJointPosClient()
 
     video_dir = Path("runs") / datetime.now().strftime("%Y-%m-%d") / datetime.now().strftime("%H-%M-%S")
@@ -48,10 +68,11 @@ def main(
     max_steps = env.env.max_episode_length
     with torch.no_grad():
         for ep in range(episodes):
-            for step in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
+            for _ in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
                 ret = client.infer(obs, "put the banana in the bowl")
-                cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
-                cv2.waitKey(1)
+                if not headless:
+                    cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
+                    cv2.waitKey(1)
                 video.append(ret["viz"])
                 action = torch.tensor(ret["action"])[None]
                 obs, _, term, trunc, _ = env.step(action)

@@ -299,20 +299,6 @@ def gripper_pos(
 
     return joint_pos
 
-def gripper_pos(
-    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-):
-    robot = env.scene[asset_cfg.name]
-    joint_names = ["finger_joint"]
-    joint_indices = [
-        i for i, name in enumerate(robot.data.joint_names) if name in joint_names
-    ]
-    joint_pos = robot.data.joint_pos[0, joint_indices]
-
-    # rescale
-    joint_pos = joint_pos / (np.pi / 4)
-
-    return joint_pos
 
 @configclass
 class ObservationCfg:

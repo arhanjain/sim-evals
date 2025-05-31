@@ -1,7 +1,6 @@
 import tyro
 import numpy as np
 from PIL import Image
-from dataclasses import dataclass
 from openpi_client import websocket_client_policy, image_tools
 
 from .abstract_client import InferenceClient
@@ -56,7 +55,6 @@ class Client(InferenceClient):
                 "prompt": instruction,
             }
             self.pred_action_chunk = self.client.infer(request_data)["actions"]
-            # assert self.pred_action_chunk.shape == (10, 8)
 
         action = self.pred_action_chunk[self.actions_from_chunk_completed]
         self.actions_from_chunk_completed += 1
