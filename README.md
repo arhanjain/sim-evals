@@ -47,11 +47,10 @@ unzip assets.zip
 ```
 
 Then, in a separate terminal, launch the policy server on `localhost:8000`. 
-For example, to launch a pi0-FAST-DROID policy (with joint position control), 
-checkout [openpi](https://github.com/Physical-Intelligence/openpi) @ branch `karl/droid_policies`, 
-follow the installation instructions, and then run, in a separate terminal:
+For example, to launch a pi0-FAST-DROID policy (with joint position control),
+change to the `submodules/openpi` directory and run the command below in a separate terminal
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 python3 scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
 ```
 
 **Note**: We set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.5` to avoid JAX hogging all the GPU memory (since Isaac Sim needs to use the same GPU).

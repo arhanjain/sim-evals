@@ -9,9 +9,9 @@ Then, in a separate terminal, launch the policy server on localhost:8000
 -- make sure to set XLA_PYTHON_CLIENT_MEM_FRACTION to avoid JAX hogging all the GPU memory.
 
 For example, to launch a pi0-FAST-DROID policy (with joint position control), 
-checkout openpi @ branch karl/droid_policies, and then run, in a separate terminal:
+run the command below in a separate terminal from the submodules/openpi directory:
 
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 python3 scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
 
 Finally, run the evaluation script:
 
