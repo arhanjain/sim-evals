@@ -71,7 +71,9 @@ def main(
         
     env_cfg.set_scene(scene)
     env = gym.make("DROID", cfg=env_cfg)
+
     obs, _ = env.reset()
+    obs, _ = env.reset() # need second render cycle to get correctly loaded materials
     client = DroidJointPosClient()
 
 
