@@ -7,9 +7,11 @@ Here is an example rollout of a pi0-FAST-DROID policy:
 Scene 1
 
 ![Scene 1](./docs/scene1.gif)
+
 Scene 2
 
 ![Scene 2](./docs/scene2.gif)
+
 Scene 3
 
 ![Scene 3](./docs/scene3.gif)
