@@ -5,10 +5,13 @@ This repository contains scripts for evaluating DROID policies in a simple ISAAC
 Here is an example rollout of a pi0-FAST-DROID policy:
 
 Scene 1
+
 ![Scene 1](./docs/scene1.gif)
 Scene 2
+
 ![Scene 2](./docs/scene2.gif)
 Scene 3
+
 ![Scene 3](./docs/scene3.gif)
 
 The simulation is tuned to work *zero-shot* with DROID policies trained on the real-world DROID dataset, so no separate simulation data is required.
