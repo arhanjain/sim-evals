@@ -10,9 +10,9 @@ dependencies = [
   "torchvision==0.20.1",
   "isaacsim[all,extscache]==4.5.0",
   "tyro>=0.9.21",
-  "openpi-client",
   "mediapy>=1.2.4",
   "numba>=0.61.2",
+  "openpi-client"
 ]
 
 [tool.uv.sources]
@@ -22,7 +22,8 @@ torch = [
 torchvision = {index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'"}
 isaacsim = { index = "isaac" }
 real2simeval = { workspace = true }
-openpi-client = { path = "submodules/openpi/packages/openpi-client" }
+openpi-client = { git = "https://github.com/Physical-Intelligence/openpi.git", subdirectory = "packages/openpi-client" }
+
 
 [[tool.uv.index]]
 name = "pytorch-cu118"
