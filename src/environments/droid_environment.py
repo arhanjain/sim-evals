@@ -5,7 +5,7 @@ import numpy as np
 
 from typing import List
 from pathlib import Path
-
+from pxr import Usd, UsdPhysics
 
 from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
@@ -134,13 +134,41 @@ class SceneCfg(InteractiveSceneCfg):
     )
 
     def dynamic_scene(self, scene_name: str):
+        environment_path = DATA_PATH / f"scene{scene_name}.usd"
         scene = AssetBaseCfg(
                 prim_path="{ENV_REGEX_NS}/scene",
                 spawn = sim_utils.UsdFileCfg(
-                    usd_path=str(DATA_PATH / f"scene{scene_name}.usd"),
+                    usd_path=str(environment_path),
                     ),
                 )
         self.scene = scene
+
+        stage = Usd.Stage.Open(
+            str(environment_path)
+        )
+        scene_prim = stage.GetPrimAtPath("/World")
+        children = scene_prim.GetChildren()
+
+        for child in children:
+            # if rigid body
+            if not UsdPhysics.RigidBodyAPI(child):
+                continue
+
+            name = child.GetName()
+            print(f"Found rigid body: {name}")
+            pos = child.GetAttribute("xformOp:translate").Get()
+            rot = child.GetAttribute("xformOp:orient").Get()
+            rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
+            asset = RigidObjectCfg(
+                        prim_path=f"{{ENV_REGEX_NS}}/scene/{name}",
+                        spawn=None,
+                        init_state=RigidObjectCfg.InitialStateCfg(
+                            pos=pos,
+                            rot=rot,
+                        ),
+                    )
+            setattr(self, name, asset)
+
 
 class BinaryJointPositionZeroToOneAction(BinaryJointPositionAction):
     # override
