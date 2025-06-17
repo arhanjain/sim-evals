@@ -60,3 +60,21 @@ Finally, run the evaluation script:
 python run_eval.py --episodes 10 --headless
 ```
 
+## Minimal Example
+
+```python
+env = gym.make("DROID", cfg=env_cfg)
+
+obs, _ = env.reset()
+obs, _ = env.reset() # need second render cycle to get correctly loaded materials
+client = # Your policy of choice
+
+max_steps = env.env.max_episode_length
+for _ in tqdm(range(max_steps), desc=f"Episode"):
+    action = client.infer(obs, INSTRUCTION) # calling inference on your policy
+    action = torch.tensor(ret["action"])[None]
+    obs, _, term, trunc, _ = env.step(action)
+    if term or trunc:
+        break
+env.close()
+```
