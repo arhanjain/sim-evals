@@ -61,9 +61,9 @@ def main(
     instruction = None
     match scene:
         case 1:
-            instruction = "put the can in the mug"
-        case 2:
             instruction = "put the cube in the bowl"
+        case 2:
+            instruction = "put the can in the mug"
         case 3:
             instruction = "put banana in the bin"
         case _:

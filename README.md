@@ -4,7 +4,17 @@ This repository contains scripts for evaluating DROID policies in a simple ISAAC
 
 Here is an example rollout of a pi0-FAST-DROID policy:
 
-![Example Rollout](./docs/droid_rollout.gif)
+Scene 1
+
+![Scene 1](./docs/scene1.gif)
+
+Scene 2
+
+![Scene 2](./docs/scene2.gif)
+
+Scene 3
+
+![Scene 3](./docs/scene3.gif)
 
 The simulation is tuned to work *zero-shot* with DROID policies trained on the real-world DROID dataset, so no separate simulation data is required.
 
@@ -57,12 +67,13 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpo
 
 Finally, run the evaluation script:
 ```bash
-python run_eval.py --episodes 10 --headless
+python run_eval.py --episodes [INT] --scene [INT] --headless
 ```
 
 ## Minimal Example
 
 ```python
+env_cfg.set_scene(scene) # pass scene integer
 env = gym.make("DROID", cfg=env_cfg)
 
 obs, _ = env.reset()
