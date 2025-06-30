@@ -22,6 +22,8 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.envs import ManagerBasedRLEnv, ManagerBasedRLEnvCfg
 from isaaclab.sensors import CameraCfg
 
+from .nvidia_droid import NVIDIA_DROID
+
 DATA_PATH = Path(__file__).parent / "../../assets"
 
 @configclass
@@ -34,74 +36,75 @@ class SceneCfg(InteractiveSceneCfg):
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, -0.6, 0.7)),
     )
 
-    robot = ArticulationCfg(
-        prim_path="{ENV_REGEX_NS}/robot",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=str(DATA_PATH / "droid.usdz"),
-            activate_contact_sensors=False,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                disable_gravity=True,
-                max_depenetration_velocity=5.0,
-            ),
-            articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-                enabled_self_collisions=False,
-                solver_position_iteration_count=36,
-                solver_velocity_iteration_count=0,
-            ),
-        ),
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0, 0, 0),
-            rot=(1, 0, 0, 0),
-            joint_pos={
-                "panda_joint1": 0.0,
-                "panda_joint2": -1 / 5 * np.pi,
-                "panda_joint3": 0.0,
-                "panda_joint4": -4 / 5 * np.pi,
-                "panda_joint5": 0.0,
-                "panda_joint6": 3 / 5 * np.pi,
-                "panda_joint7": 0,
-                "finger_joint": 0.0,
-                "right_outer.*": 0.0,
-                "left_outer.*": 0.0,
-                "left_inner_finger_knuckle_joint": 0.0,
-                "right_inner_finger_knuckle_joint": 0.0,
-                "left_inner_finger_joint": 0.0,
-                "right_inner_finger_joint": 0.0,
-            },
-        ),
-        soft_joint_pos_limit_factor=1,
-        actuators={
-            "panda_shoulder": ImplicitActuatorCfg(
-                joint_names_expr=["panda_joint[1-4]"],
-                effort_limit=87.0,
-                velocity_limit=2.175,
-                stiffness=400.0,
-                damping=80.0,
-            ),
-            "panda_forearm": ImplicitActuatorCfg(
-                joint_names_expr=["panda_joint[5-7]"],
-                effort_limit=12.0,
-                velocity_limit=2.61,
-                stiffness=400.0,
-                damping=80.0,
-            ),
-            "gripper": ImplicitActuatorCfg(
-                joint_names_expr=["finger_joint"],
-                stiffness=15,
-                damping=5,
-                velocity_limit=0.5,
-                effort_limit=120,
-            ),
-            "inner_finger": ImplicitActuatorCfg(
-                joint_names_expr=[".*_inner_finger_joint"],
-                stiffness=0.2,
-                damping=0.02,
-                velocity_limit=3.0,
-                effort_limit=0.5,
-            ),
-        },
-    )
-
+    robot = NVIDIA_DROID
+    # robot = ArticulationCfg(
+    #     prim_path="{ENV_REGEX_NS}/robot",
+    #     spawn=sim_utils.UsdFileCfg(
+    #         usd_path=str(DATA_PATH / "droid.usdz"),
+    #         activate_contact_sensors=False,
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
+    #             disable_gravity=True,
+    #             max_depenetration_velocity=5.0,
+    #         ),
+    #         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+    #             enabled_self_collisions=False,
+    #             solver_position_iteration_count=36,
+    #             solver_velocity_iteration_count=0,
+    #         ),
+    #     ),
+    #     init_state=ArticulationCfg.InitialStateCfg(
+    #         pos=(0, 0, 0),
+    #         rot=(1, 0, 0, 0),
+    #         joint_pos={
+    #             "panda_joint1": 0.0,
+    #             "panda_joint2": -1 / 5 * np.pi,
+    #             "panda_joint3": 0.0,
+    #             "panda_joint4": -4 / 5 * np.pi,
+    #             "panda_joint5": 0.0,
+    #             "panda_joint6": 3 / 5 * np.pi,
+    #             "panda_joint7": 0,
+    #             "finger_joint": 0.0,
+    #             "right_outer.*": 0.0,
+    #             "left_outer.*": 0.0,
+    #             "left_inner_finger_knuckle_joint": 0.0,
+    #             "right_inner_finger_knuckle_joint": 0.0,
+    #             "left_inner_finger_joint": 0.0,
+    #             "right_inner_finger_joint": 0.0,
+    #         },
+    #     ),
+    #     soft_joint_pos_limit_factor=1,
+    #     actuators={
+    #         "panda_shoulder": ImplicitActuatorCfg(
+    #             joint_names_expr=["panda_joint[1-4]"],
+    #             effort_limit=87.0,
+    #             velocity_limit=2.175,
+    #             stiffness=400.0,
+    #             damping=80.0,
+    #         ),
+    #         "panda_forearm": ImplicitActuatorCfg(
+    #             joint_names_expr=["panda_joint[5-7]"],
+    #             effort_limit=12.0,
+    #             velocity_limit=2.61,
+    #             stiffness=400.0,
+    #             damping=80.0,
+    #         ),
+    #         "gripper": ImplicitActuatorCfg(
+    #             joint_names_expr=["finger_joint"],
+    #             stiffness=15,
+    #             damping=5,
+    #             velocity_limit=0.5,
+    #             effort_limit=120,
+    #         ),
+    #         "inner_finger": ImplicitActuatorCfg(
+    #             joint_names_expr=[".*_inner_finger_joint"],
+    #             stiffness=0.2,
+    #             damping=0.02,
+    #             velocity_limit=3.0,
+    #             effort_limit=0.5,
+    #         ),
+    #     },
+    # )
+    #
     external_cam = CameraCfg(
         prim_path="{ENV_REGEX_NS}/external_cam",
         height=720,
@@ -118,7 +121,8 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
     wrist_cam = CameraCfg(
-        prim_path="{ENV_REGEX_NS}/robot/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
+        # prim_path="{ENV_REGEX_NS}/robot/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
+        prim_path="{ENV_REGEX_NS}/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
         height=720,
         width=1280,
         data_types=["rgb"],
@@ -268,11 +272,11 @@ class ActionCfg:
         close_command_expr={"finger_joint": np.pi / 4},
     )
 
-    compliant_joints = TargetJointPositionStaticActionCfg(
-        asset_name="robot",
-        joint_names=["left_inner_finger_joint", "right_inner_finger_joint"],
-        target=[-np.pi / 4, np.pi / 4],
-    )
+    # compliant_joints = TargetJointPositionStaticActionCfg(
+    #     asset_name="robot",
+    #     joint_names=["left_inner_finger_joint", "right_inner_finger_joint"],
+    #     target=[-np.pi / 4, np.pi / 4],
+    # )
 
 
 def arm_joint_pos(
