@@ -58,7 +58,7 @@ unzip assets.zip
 
 Then, in a separate terminal, launch the policy server on `localhost:8000`. 
 For example, to launch a pi0-FAST-DROID policy (with joint position control),
-checkout openpi to the `karl/droid_policies` branch and run the command below in a separate terminal
+checkout [openpi](https://github.com/Physical-Intelligence/openpi/tree/karl/droid_policies) to the `karl/droid_policies` branch and run the command below in a separate terminal
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
 ```
