@@ -33,7 +33,7 @@ from src.inference.droid_jointpos import Client as DroidJointPosClient
 
 def main(
         episodes = 10,
-        headless: bool = True,
+        headless: bool = False,
         scene: int = 1,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
