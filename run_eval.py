@@ -35,6 +35,7 @@ def main(
         episodes = 10,
         headless: bool = True,
         scene: int = 1,
+        num_envs: int = 1,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -55,7 +56,7 @@ def main(
     env_cfg = parse_env_cfg(
         "DROID",
         device=args_cli.device,
-        num_envs=1,
+        num_envs=num_envs,
         use_fabric=True,
     )
     instruction = None
