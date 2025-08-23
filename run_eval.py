@@ -85,7 +85,7 @@ def main(
     with torch.no_grad():
         for ep in range(episodes):
             for _ in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
-                ret = client.infer(obs, "put the marker in the mug")
+                ret = client.infer(obs, instruction)
                 if not headless:
                     cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
                     cv2.waitKey(1)
