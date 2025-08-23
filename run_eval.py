@@ -32,7 +32,7 @@ from src.inference.droid_jointpos import Client as DroidJointPosClient
 
 
 def main(
-        episodes = 10,
+        episodes:int = 10,
         headless: bool = True,
         scene: int = 1,
         ):

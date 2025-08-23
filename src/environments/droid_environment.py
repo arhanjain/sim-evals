@@ -37,74 +37,7 @@ class SceneCfg(InteractiveSceneCfg):
     )
 
     robot = NVIDIA_DROID
-    # robot = ArticulationCfg(
-    #     prim_path="{ENV_REGEX_NS}/robot",
-    #     spawn=sim_utils.UsdFileCfg(
-    #         usd_path=str(DATA_PATH / "droid.usdz"),
-    #         activate_contact_sensors=False,
-    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-    #             disable_gravity=True,
-    #             max_depenetration_velocity=5.0,
-    #         ),
-    #         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-    #             enabled_self_collisions=False,
-    #             solver_position_iteration_count=36,
-    #             solver_velocity_iteration_count=0,
-    #         ),
-    #     ),
-    #     init_state=ArticulationCfg.InitialStateCfg(
-    #         pos=(0, 0, 0),
-    #         rot=(1, 0, 0, 0),
-    #         joint_pos={
-    #             "panda_joint1": 0.0,
-    #             "panda_joint2": -1 / 5 * np.pi,
-    #             "panda_joint3": 0.0,
-    #             "panda_joint4": -4 / 5 * np.pi,
-    #             "panda_joint5": 0.0,
-    #             "panda_joint6": 3 / 5 * np.pi,
-    #             "panda_joint7": 0,
-    #             "finger_joint": 0.0,
-    #             "right_outer.*": 0.0,
-    #             "left_outer.*": 0.0,
-    #             "left_inner_finger_knuckle_joint": 0.0,
-    #             "right_inner_finger_knuckle_joint": 0.0,
-    #             "left_inner_finger_joint": 0.0,
-    #             "right_inner_finger_joint": 0.0,
-    #         },
-    #     ),
-    #     soft_joint_pos_limit_factor=1,
-    #     actuators={
-    #         "panda_shoulder": ImplicitActuatorCfg(
-    #             joint_names_expr=["panda_joint[1-4]"],
-    #             effort_limit=87.0,
-    #             velocity_limit=2.175,
-    #             stiffness=400.0,
-    #             damping=80.0,
-    #         ),
-    #         "panda_forearm": ImplicitActuatorCfg(
-    #             joint_names_expr=["panda_joint[5-7]"],
-    #             effort_limit=12.0,
-    #             velocity_limit=2.61,
-    #             stiffness=400.0,
-    #             damping=80.0,
-    #         ),
-    #         "gripper": ImplicitActuatorCfg(
-    #             joint_names_expr=["finger_joint"],
-    #             stiffness=15,
-    #             damping=5,
-    #             velocity_limit=0.5,
-    #             effort_limit=120,
-    #         ),
-    #         "inner_finger": ImplicitActuatorCfg(
-    #             joint_names_expr=[".*_inner_finger_joint"],
-    #             stiffness=0.2,
-    #             damping=0.02,
-    #             velocity_limit=3.0,
-    #             effort_limit=0.5,
-    #         ),
-    #     },
-    # )
-    #
+
     external_cam = CameraCfg(
         prim_path="{ENV_REGEX_NS}/external_cam",
         height=720,
@@ -121,7 +54,6 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
     wrist_cam = CameraCfg(
-        # prim_path="{ENV_REGEX_NS}/robot/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
         prim_path="{ENV_REGEX_NS}/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
         height=720,
         width=1280,
@@ -207,54 +139,6 @@ class BinaryJointPositionZeroToOneActionCfg(BinaryJointPositionActionCfg):
 
     class_type = BinaryJointPositionZeroToOneAction
 
-
-class TargetJointPositionStaticAction(JointAction):
-    """Joint action term that applies the processed actions to the articulation's joints as position commands."""
-
-    """The configuration of the action term."""
-
-    def __init__(self, cfg, env: ManagerBasedRLEnv):
-        # initialize the action term
-        super().__init__(cfg, env)
-        # use default joint positions as offset
-        if cfg.use_default_offset:
-            self._offset = self._asset.data.default_joint_pos[
-                :, self._joint_ids
-            ].clone()
-        # self._default_actions = self._asset.data.default_joint_pos[:, self._joint_ids].clone()
-        self._default_actions = self._asset.data.default_joint_pos[
-            :, self._joint_ids
-        ].clone()
-        self._default_actions[:] = torch.tensor(cfg.target)
-
-    @property
-    def action_dim(self) -> int:
-        return 0
-
-    def process_actions(self, actions: torch.Tensor):
-        pass
-
-    def apply_actions(self):
-        # set position targets
-        self._asset.set_joint_position_target(
-            self._default_actions, joint_ids=self._joint_ids
-        )
-
-
-@configclass
-class TargetJointPositionStaticActionCfg(mdp.JointActionCfg):
-    """Configuration for the joint position action term.
-
-    See :class:`JointPositionAction` for more details.
-    """
-
-    target: List[float] = [0.0]
-
-    class_type = TargetJointPositionStaticAction
-    use_default_offset: bool = True
-    preserve_order: bool = True
-
-
 @configclass
 class ActionCfg:
     body = mdp.JointPositionActionCfg(
@@ -267,17 +151,9 @@ class ActionCfg:
     finger_joint = BinaryJointPositionZeroToOneActionCfg(
         asset_name="robot",
         joint_names=["finger_joint"],
-        open_command_expr={"finger_joint": -np.pi / 4},
-        # open_command_expr = {"finger_joint": 0.0},
+        open_command_expr = {"finger_joint": 0.0},
         close_command_expr={"finger_joint": np.pi / 4},
     )
-
-    # compliant_joints = TargetJointPositionStaticActionCfg(
-    #     asset_name="robot",
-    #     joint_names=["left_inner_finger_joint", "right_inner_finger_joint"],
-    #     target=[-np.pi / 4, np.pi / 4],
-    # )
-
 
 def arm_joint_pos(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
@@ -403,11 +279,6 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physx.gpu_collision_stack_size = 2**30
         self.rerender_on_reset = True
 
-
-        # self.sim.render.enable_reflections = False
-        # self.sim.render.enable_shadows = False
-        # self.sim.render.enable_direct_lighting = False
-        # self.sim.render.enable_ambient_occlusion = False
     
     def set_scene(self, scene_name: str):
         self.scene.dynamic_scene(scene_name)

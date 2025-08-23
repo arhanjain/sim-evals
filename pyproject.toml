@@ -3,16 +3,13 @@ name = "sim-evals"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "pip>=25.0",
-  "torch==2.5.1",
-  "torchvision==0.20.1",
-  "isaacsim[all,extscache]==4.5.0",
-  "tyro>=0.9.21",
   "mediapy>=1.2.4",
-  "numba>=0.61.2",
-  "openpi-client"
+  "openpi-client",
+  "isaaclab[all,isaacsim]==2.2.0",
+  "tyro>=0.9.17",
 ]
 
 [tool.uv.sources]
@@ -24,15 +21,15 @@ isaacsim = { index = "isaac" }
 real2simeval = { workspace = true }
 openpi-client = { git = "https://github.com/Physical-Intelligence/openpi.git", subdirectory = "packages/openpi-client" }
 
+[[tool.uv.index]]
+name = "isaac"
+url = "https://pypi.nvidia.com"
+explicit = true
+
 
 [[tool.uv.index]]
 name = "pytorch-cu118"
 url = "https://download.pytorch.org/whl/cu118"
-explicit = true
-
-[[tool.uv.index]]
-name = "isaac"
-url = "https://pypi.nvidia.com"
 explicit = true
 
 [tool.basedpyright]
