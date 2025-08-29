@@ -12,7 +12,12 @@ dependencies = [
   "tyro>=0.9.21",
   "mediapy>=1.2.4",
   "numba>=0.61.2",
-  "openpi-client"
+  "openpi-client",
+  "huggingface-hub==0.34.4",
+  "diffusers==0.30.2",
+  "ipdb>=0.13.13",
+  "json-numpy>=2.1.1",
+  "opencv-python>=4.11.0.86",
 ]
 
 [tool.uv.sources]

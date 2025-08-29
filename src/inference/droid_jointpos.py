@@ -1,20 +1,26 @@
-import tyro
 import numpy as np
+import requests
 from PIL import Image
-from openpi_client import websocket_client_policy, image_tools
+import json_numpy
+from openpi_client import image_tools, websocket_client_policy
 
 from .abstract_client import InferenceClient
 
+
 class Client(InferenceClient):
-    def __init__(self, 
-                remote_host:str = "localhost", 
-                remote_port:int = 8000,
-                open_loop_horizon:int = 8,
+    def __init__(self,
+                 remote_host: str = "localhost",
+                 remote_port: int = 8000,
+                 open_loop_horizon: int = 8,
                  ) -> None:
         self.open_loop_horizon = open_loop_horizon
-        self.client = websocket_client_policy.WebsocketClientPolicy(
-            remote_host, remote_port
-        )
+        # self.client = websocket_client_policy.WebsocketClientPolicy(
+        #     remote_host, remote_port
+        # )
+
+        json_numpy.patch()
+        self.client_session = requests.Session()
+        self.client_url = f"http://{remote_host}:{remote_port}"
 
         self.actions_from_chunk_completed = 0
         self.pred_action_chunk = None
@@ -43,18 +49,33 @@ class Client(InferenceClient):
             or self.actions_from_chunk_completed >= self.open_loop_horizon
         ):
             self.actions_from_chunk_completed = 0
+            # request_data = {
+            #     "observation/exterior_image_1_left": image_tools.resize_with_pad(
+            #         curr_obs["right_image"], 224, 224
+            #     ),
+            #     "observation/wrist_image_left": image_tools.resize_with_pad(
+            #         curr_obs["wrist_image"], 224, 224
+            #     ),
+            #     "observation/joint_position": curr_obs["joint_position"],
+            #     "observation/gripper_position": curr_obs["gripper_position"],
+            #     "prompt": instruction,
+            # }
+            # result = self.client.infer(request_data)
+            # self.pred_action_chunk = result['actions']
+            # print(instruction)
+
             request_data = {
-                "observation/exterior_image_1_left": image_tools.resize_with_pad(
-                    curr_obs["right_image"], 224, 224
-                ),
-                "observation/wrist_image_left": image_tools.resize_with_pad(
-                    curr_obs["wrist_image"], 224, 224
-                ),
-                "observation/joint_position": curr_obs["joint_position"],
-                "observation/gripper_position": curr_obs["gripper_position"],
-                "prompt": instruction,
+                "observation": {
+                    "video.exterior_image_1": image_tools.resize_with_pad(curr_obs["right_image"], 256, 256).reshape(1, 256, 256, 3),
+                    "video.wrist_image": image_tools.resize_with_pad(curr_obs["wrist_image"], 256, 256).reshape(1, 256, 256, 3),
+                    "state.joint_position": curr_obs["joint_position"].reshape(1, 7),  # 7
+                    "state.gripper_position": curr_obs["gripper_position"].reshape(1, 1),  # 1
+                    "annotation.language.language_instruction": [instruction],
+                },
             }
-            self.pred_action_chunk = self.client.infer(request_data)["actions"]
+            response = self.client_session.post(self.client_url + "/act", json=request_data)
+            result = response.json()
+            self.pred_action_chunk = np.hstack([result["action.joint_position"], result["action.gripper_position"].reshape(-1, 1)])
 
         action = self.pred_action_chunk[self.actions_from_chunk_completed]
         self.actions_from_chunk_completed += 1
@@ -93,19 +114,27 @@ class Client(InferenceClient):
             "gripper_position": gripper_position,
         }
 
+
 if __name__ == "__main__":
     import torch
-    args = tyro.cli(Args)
-    client = Client(args)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--remote_host", type=str, default="localhost")
+    parser.add_argument("--remote_port", type=int, default=5555)
+    parser.add_argument("--open_loop_horizon", type=int, default=8)
+    args = parser.parse_args()
+    # args = tyro.cli(Args)
+    client = Client(
+        remote_host=args.remote_host,
+        remote_port=args.remote_port,
+        open_loop_horizon=args.open_loop_horizon
+    )
     fake_obs = {
-        "splat": {
-            "right_cam": np.zeros((224, 224, 3), dtype=np.uint8),
-            "wrist_cam": np.zeros((224, 224, 3), dtype=np.uint8),
-        },
         "policy": {
+            "external_cam": [torch.zeros((224, 224, 3), dtype=torch.uint8)],
+            "wrist_cam": [torch.zeros((224, 224, 3), dtype=torch.uint8)],
             "arm_joint_pos": torch.zeros((7,), dtype=torch.float32),
             "gripper_pos": torch.zeros((1,), dtype=torch.float32),
-
         },
     }
     fake_instruction = "pick up the object"
@@ -113,7 +142,7 @@ if __name__ == "__main__":
     import time
 
     start = time.time()
-    client.infer(fake_obs, fake_instruction) # warm up
+    client.infer(fake_obs, fake_instruction)  # warm up
     num = 20
     for i in range(num):
         ret = client.infer(fake_obs, fake_instruction)
