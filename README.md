@@ -1,5 +1,8 @@
 # DROID Sim Evaluation
 
+**LATEST COMMIT MAY HAVE A PHYSIC/FRICTION ISSUE**
+Roll back to commit before latest PR for temporary hack fix until I get time to fix this...
+
 This repository contains scripts for evaluating DROID policies in a simple ISAAC Sim environment.
 
 Here is an example rollout of a pi0-FAST-DROID policy:
