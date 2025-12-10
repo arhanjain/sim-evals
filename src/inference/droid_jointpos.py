@@ -73,8 +73,8 @@ class Client(InferenceClient):
 
     def _extract_observation(self, obs_dict, *, save_to_disk=False):
         # Assign images
-        right_image = obs_dict["policy"]["external_cam"][0].clone().detach().cpu().numpy()
-        wrist_image = obs_dict["policy"]["wrist_cam"][0].clone().detach().cpu().numpy()
+        right_image = obs_dict["policy"]["external_cam"].clone().detach().cpu().numpy()
+        wrist_image = obs_dict["policy"]["wrist_cam"].clone().detach().cpu().numpy()
 
         # Capture proprioceptive state
         robot_state = obs_dict["policy"]
