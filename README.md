@@ -45,11 +45,6 @@ uv sync
 source .venv/bin/activate
 ```
 
-Install extra dependencies
-```bash
-./submodules/IsaacLab/isaaclab.sh -i
-```
-
 ## Quick Start
 
 First, make sure you download the simulation assets and unpack them into the root directory of this package.
