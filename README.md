@@ -1,8 +1,5 @@
 # DROID Sim Evaluation
 
-**LATEST COMMIT MAY HAVE A PHYSIC/FRICTION ISSUE**
-Roll back to commit before latest PR for temporary hack fix until I get time to fix this...
-
 This repository contains scripts for evaluating DROID policies in a simple ISAAC Sim environment.
 
 Here is an example rollout of a pi0-FAST-DROID policy:
@@ -47,21 +44,19 @@ source .venv/bin/activate
 
 ## Quick Start
 
-First, make sure you download the simulation assets and unpack them into the root directory of this package.
-Using the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), this can be done with:
+First, make sure you download the simulation assets into the root of this directory
 ```bash
-curl -O https://storage.googleapis.com/openpi-assets-simeval/env_assets/simple_example_v2/assets.zip
-unzip assets.zip
+uvx hf download owhan/DROID-sim-environments --repo-type=dataset
 ```
 
 Then, in a separate terminal, launch the policy server on `localhost:8000`. 
 For example, to launch a pi0-FAST-DROID policy (with joint position control),
-checkout [openpi](https://github.com/Physical-Intelligence/openpi/tree/karl/droid_policies) to the `karl/droid_policies` branch and run the command below in a separate terminal
+checkout [openpi](https://github.com/Physical-Intelligence/openpi) and use the `polaris` configs 
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi0_fast_droid_jointpos --policy.dir=s3://openpi-assets-simeval/pi0_fast_droid_jointpos
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpoint --policy.config=pi05_droid_jointpos_polaris --policy.dir=gs://openpi-assets/checkpoints/pi05_droid_jointpos
 ```
 
-**Note**: We set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.5` to avoid JAX hogging all the GPU memory (since Isaac Sim needs to use the same GPU).
+**Note**: We set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.5` to avoid JAX hogging all the GPU memory (incase Isaac Sim is using the same GPU).
 
 Finally, run the evaluation script:
 ```bash
