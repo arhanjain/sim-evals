@@ -24,7 +24,7 @@ from isaaclab.sensors import CameraCfg
 
 from .nvidia_droid import NVIDIA_DROID
 
-DATA_PATH = Path(__file__).parent / "../../assets"
+DATA_PATH = Path(__file__).parent / "../../DROID-sim-environments/"
 
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -53,6 +53,23 @@ class SceneCfg(InteractiveSceneCfg):
             pos=(0.05, 0.57, 0.66), rot=(-0.393, -0.195, 0.399, 0.805), convention="opengl"
         ),
     )
+
+    external_cam_2 = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/external_cam_2",
+        height=720,
+        width=1280,
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=2.1,
+            focus_distance=28.0,
+            horizontal_aperture=5.376,
+            vertical_aperture=3.024,
+        ),
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.05, -0.57, 0.66), rot=(0.805, 0.399, -0.195, -0.393), convention="opengl"
+        ),
+    )
+
     wrist_cam = CameraCfg(
         prim_path="{ENV_REGEX_NS}/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
         height=720,
@@ -206,6 +223,14 @@ class ObservationCfg:
                 func=mdp.observations.image,
                 params={
                     "sensor_cfg": SceneEntityCfg("external_cam"),
+                    "data_type": "rgb",
+                    "normalize": False,
+                    }
+                )
+        external_cam_2 = ObsTerm(
+                func=mdp.observations.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("external_cam_2"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
