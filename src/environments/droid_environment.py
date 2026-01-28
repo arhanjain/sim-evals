@@ -189,7 +189,7 @@ def arm_joint_pos(
     joint_indices = [
         i for i, name in enumerate(robot.data.joint_names) if name in joint_names
     ]
-    joint_pos = robot.data.joint_pos[0, joint_indices]
+    joint_pos = robot.data.joint_pos[:, joint_indices]
     return joint_pos
 
 
@@ -201,7 +201,7 @@ def gripper_pos(
     joint_indices = [
         i for i, name in enumerate(robot.data.joint_names) if name in joint_names
     ]
-    joint_pos = robot.data.joint_pos[0, joint_indices]
+    joint_pos = robot.data.joint_pos[:, joint_indices]
 
     # rescale
     joint_pos = joint_pos / (np.pi / 4)
@@ -277,7 +277,7 @@ class CurriculumCfg:
 
 @configclass
 class EnvCfg(ManagerBasedRLEnvCfg):
-    scene = SceneCfg(num_envs=1, env_spacing=7.0)
+    scene = SceneCfg(env_spacing=7.0)
 
     observations = ObservationCfg()
     actions = ActionCfg()
