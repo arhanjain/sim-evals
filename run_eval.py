@@ -16,6 +16,7 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpo
 Finally, run the evaluation script:
 
 python run_eval.py --episodes 10 --headless
+python run_eval.py --episodes 10 --environment DROID-CanInMug --headless
 """
 
 import tyro
@@ -35,6 +36,7 @@ def main(
         episodes:int = 10,
         headless: bool = True,
         scene: int = 1,
+        environment: str | None = None,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -48,29 +50,30 @@ def main(
 
     # All IsaacLab dependent modules should be imported after the app is launched
     import sim_evals.environments # noqa: F401
+    from sim_evals.environments.droid_environment import get_scene_spec
     from isaaclab_tasks.utils import parse_env_cfg
 
+    if environment is None:
+        scene_spec = get_scene_spec(scene)
+        env_id = scene_spec.env_id
+    elif environment == "DROID":
+        scene_spec = get_scene_spec(scene)
+        env_id = environment
+    else:
+        scene_spec = get_scene_spec(environment)
+        env_id = scene_spec.env_id
 
     # Initialize the env
     env_cfg = parse_env_cfg(
-        "DROID",
+        env_id,
         device=args_cli.device,
         num_envs=1,
         use_fabric=True,
     )
-    instruction = None
-    match scene:
-        case 1:
-            instruction = "put the cube in the bowl"
-        case 2:
-            instruction = "put the can in the mug"
-        case 3:
-            instruction = "put banana in the bin"
-        case _:
-            raise ValueError(f"Scene {scene} not supported")
-        
-    env_cfg.set_scene(scene)
-    env = gym.make("DROID", cfg=env_cfg)
+
+    env_cfg.set_scene(scene_spec.scene_id)
+    instruction = getattr(env_cfg, "language_instruction", scene_spec.instruction)
+    env = gym.make(env_id, cfg=env_cfg)
 
     obs, _ = env.reset()
     obs, _ = env.reset() # need second render cycle to get correctly loaded materials

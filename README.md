@@ -63,6 +63,19 @@ Finally, run the evaluation script:
 python run_eval.py --episodes [INT] --scene [INT] --headless
 ```
 
+The current scenes are also registered as individual Gym environments:
+
+| Environment ID | Legacy scene id | Prompt |
+| --- | --- | --- |
+| `DROID-CubeInBowl` | `1` | `put the cube in the bowl` |
+| `DROID-CanInMug` | `2` | `put the can in the mug` |
+| `DROID-BananaInBin` | `3` | `put banana in the bin` |
+
+You can run a named environment directly:
+```bash
+python run_eval.py --episodes [INT] --environment DROID-CanInMug --headless
+```
+
 ## Minimal Example
 
 ```python

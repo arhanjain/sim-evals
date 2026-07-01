@@ -3,7 +3,7 @@ import isaaclab.sim as sim_utils
 import isaaclab.envs.mdp as mdp
 import numpy as np
 
-from typing import List
+from typing import NamedTuple
 from pathlib import Path
 from pxr import Usd, UsdPhysics
 
@@ -25,6 +25,51 @@ from isaaclab.sensors import CameraCfg
 from .nvidia_droid import NVIDIA_DROID
 
 DATA_PATH = Path(__file__).parent / "../../../assets/"
+
+
+class DroidSceneSpec(NamedTuple):
+    env_id: str
+    scene_id: int
+    instruction: str
+
+
+DROID_SCENES = {
+    1: DroidSceneSpec(
+        env_id="DROID-CubeInBowl",
+        scene_id=1,
+        instruction="put the cube in the bowl",
+    ),
+    2: DroidSceneSpec(
+        env_id="DROID-CanInMug",
+        scene_id=2,
+        instruction="put the can in the mug",
+    ),
+    3: DroidSceneSpec(
+        env_id="DROID-BananaInBin",
+        scene_id=3,
+        instruction="put banana in the bin",
+    ),
+}
+
+ENV_ID_TO_SCENE = {spec.env_id: spec for spec in DROID_SCENES.values()}
+
+
+def get_scene_spec(scene: int | str) -> DroidSceneSpec:
+    if isinstance(scene, str):
+        if scene.isdigit():
+            scene = int(scene)
+        elif scene in ENV_ID_TO_SCENE:
+            return ENV_ID_TO_SCENE[scene]
+        else:
+            valid = ", ".join(spec.env_id for spec in DROID_SCENES.values())
+            raise ValueError(f"Unknown DROID scene {scene!r}. Valid env ids: {valid}")
+
+    try:
+        return DROID_SCENES[int(scene)]
+    except (KeyError, ValueError) as exc:
+        valid = ", ".join(str(scene_id) for scene_id in DROID_SCENES)
+        raise ValueError(f"Unknown DROID scene {scene!r}. Valid scene ids: {valid}") from exc
+
 
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -86,8 +131,12 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    def dynamic_scene(self, scene_name: str):
-        environment_path = DATA_PATH / f"scene{scene_name}.usd"
+    def dynamic_scene(self, scene_name: int | str) -> dict:
+        scene_spec = get_scene_spec(scene_name)
+        environment_path = DATA_PATH / f"scene{scene_spec.scene_id}.usd"
+        if not environment_path.exists():
+            raise FileNotFoundError(f"Could not find DROID scene asset: {environment_path}")
+
         scene = AssetBaseCfg(
                 prim_path="{ENV_REGEX_NS}/scene",
                 spawn = sim_utils.UsdFileCfg(
@@ -95,10 +144,15 @@ class SceneCfg(InteractiveSceneCfg):
                     ),
                 )
         self.scene = scene
+        scene_object_names = []
+        scene_objects = {}
 
         stage = Usd.Stage.Open(
             str(environment_path)
         )
+        if stage is None:
+            raise RuntimeError(f"Failed to open DROID scene asset: {environment_path}")
+
         scene_prim = stage.GetPrimAtPath("/World")
         children = scene_prim.GetChildren()
 
@@ -108,7 +162,7 @@ class SceneCfg(InteractiveSceneCfg):
                 continue
 
             name = child.GetName()
-            print(f"Found rigid body: {name}")
+            scene_object_names.append(name)
             pos = child.GetAttribute("xformOp:translate").Get()
             rot = child.GetAttribute("xformOp:orient").Get()
             rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
@@ -121,6 +175,16 @@ class SceneCfg(InteractiveSceneCfg):
                         ),
                     )
             setattr(self, name, asset)
+            scene_objects[name] = asset
+
+        return {
+            "scene_id": scene_spec.scene_id,
+            "scene_env_id": scene_spec.env_id,
+            "scene_instruction": scene_spec.instruction,
+            "scene_asset_path": str(environment_path),
+            "scene_object_names": scene_object_names,
+            "scene_objects": scene_objects,
+        }
 
 
 class BinaryJointPositionZeroToOneAction(BinaryJointPositionAction):
@@ -305,7 +369,35 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.rerender_on_reset = True
 
     
-    def set_scene(self, scene_name: str):
-        self.scene.dynamic_scene(scene_name)
+    def set_scene(self, scene_name: int | str):
+        scene_spec = get_scene_spec(scene_name)
+        self.scene_id = scene_spec.scene_id
+        self.scene_env_id = scene_spec.env_id
+        self.language_instruction = scene_spec.instruction
+        scene_metadata = self.scene.dynamic_scene(scene_spec.scene_id)
+        self.scene_asset_path = scene_metadata["scene_asset_path"]
+        self.scene_object_names = scene_metadata["scene_object_names"]
+        self.scene_objects = scene_metadata["scene_objects"]
+
+
+@configclass
+class CubeInBowlEnvCfg(EnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.set_scene(1)
+
+
+@configclass
+class CanInMugEnvCfg(EnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.set_scene(2)
+
+
+@configclass
+class BananaInBinEnvCfg(EnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.set_scene(3)
 
 
