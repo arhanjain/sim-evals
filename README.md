@@ -49,6 +49,11 @@ First, make sure you download the simulation assets into the root of this direct
 uvx hf download owhan/DROID-sim-environments --repo-type dataset --local-dir assets
 ```
 
+If the assets live somewhere else, point the evaluator at that directory:
+```bash
+export SIM_EVALS_ASSET_ROOT=/path/to/assets
+```
+
 Then, in a separate terminal, launch the policy server on `localhost:8000`. 
 For example, to launch a pi0-FAST-DROID policy (with joint position control),
 checkout [openpi](https://github.com/Physical-Intelligence/openpi) and use the `polaris` configs 
@@ -65,15 +70,33 @@ python run_eval.py --episodes [INT] --scene [INT] --headless
 
 The current scenes are also registered as individual Gym environments:
 
-| Environment ID | Legacy scene id | Prompt |
+| Environment ID | Scene id | Expected `Scene.usd` |
 | --- | --- | --- |
-| `DROID-CubeInBowl` | `1` | `put the cube in the bowl` |
-| `DROID-CanInMug` | `2` | `put the can in the mug` |
-| `DROID-BananaInBin` | `3` | `put banana in the bin` |
+| `DROID-CubeInBowl` | `1` | `scene1.usd` |
+| `DROID-CanInMug` | `2` | `scene2.usd` |
+| `DROID-BananaInBin` | `3` | `scene3.usd` |
+| `DROID-Berkeley-Task1` | `101` | `Berkeley/Berkeley_Task1/Scene.usd` |
+| `DROID-UPenn-FrankaKitchen` | `201` | `UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd` |
+| `DROID-UPenn-TeaRoom` | `202` | `UPenn/TASK-2-Levine459-TeaRoom/Scene.usd` |
+| `DROID-UPenn-LivingRoom` | `203` | `UPenn/TASK-3-AGH-LivingRoom/Scene.usd` |
+| `DROID-UTAustin-Task1` | `301` | `UT-Austin/UT-Austin-Task1/Scene.usd` |
+| `DROID-UTAustin-Task2` | `302` | `UT-Austin/UT-Austin-Task2/Scene.usd` |
+| `DROID-UTAustin-Task3` | `303` | `UT-Austin/UT-Austin-Task3/Scene.usd` |
+| `DROID-Yonsei-Task1` | `401` | `Yonsei/Task1_20260424/Scene.usd` |
+| `DROID-Yonsei-Task2` | `402` | `Yonsei/Task2/Scene.usd` |
+| `DROID-MILA-Task1` | `501` | `MILA/Task1/Scene.usd` |
+| `DROID-MILA-Task2` | `502` | `MILA/Task2/Scene.usd` |
+| `DROID-FrodoBots-Task1` | `601` | `FrodoBots/Task1/Scene.usd` |
+| `DROID-FrodoBots-Task2` | `602` | `FrodoBots/Task2/Scene.usd` |
 
 You can run a named environment directly:
 ```bash
 python run_eval.py --episodes [INT] --environment DROID-CanInMug --headless
+```
+
+For LW environments, pass the task prompt explicitly when needed:
+```bash
+python run_eval.py --episodes [INT] --environment DROID-MILA-Task1 --instruction "Pick up the spoon and place it in the sink." --headless
 ```
 
 ## Minimal Example

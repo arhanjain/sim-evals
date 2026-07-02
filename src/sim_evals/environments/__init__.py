@@ -1,18 +1,15 @@
 import gymnasium as gym
 from .droid_environment import (
-    BananaInBinEnvCfg,
-    CanInMugEnvCfg,
-    CubeInBowlEnvCfg,
+    DROID_SCENES,
     EnvCfg as DroidEnvCfg,
+    make_env_cfg_class,
 )
 from isaaclab.envs import ManagerBasedRLEnv
 
-_DROID_ENV_CFGS = {
-    "DROID": DroidEnvCfg,
-    "DROID-CubeInBowl": CubeInBowlEnvCfg,
-    "DROID-CanInMug": CanInMugEnvCfg,
-    "DROID-BananaInBin": BananaInBinEnvCfg,
-}
+_DROID_ENV_CFGS = {"DROID": DroidEnvCfg}
+_DROID_ENV_CFGS.update(
+    {scene_spec.env_id: make_env_cfg_class(scene_spec.env_id) for scene_spec in DROID_SCENES.values()}
+)
 
 
 def _register_droid_env(env_id: str, env_cfg_entry_point: type[DroidEnvCfg]) -> None:

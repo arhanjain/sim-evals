@@ -17,6 +17,7 @@ Finally, run the evaluation script:
 
 python run_eval.py --episodes 10 --headless
 python run_eval.py --episodes 10 --environment DROID-CanInMug --headless
+python run_eval.py --episodes 10 --environment DROID-MILA-Task1 --instruction "Pick up the spoon and place it in the sink." --headless
 """
 
 import tyro
@@ -37,6 +38,7 @@ def main(
         headless: bool = True,
         scene: int = 1,
         environment: str | None = None,
+        instruction: str | None = None,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -72,7 +74,7 @@ def main(
     )
 
     env_cfg.set_scene(scene_spec.scene_id)
-    instruction = getattr(env_cfg, "language_instruction", scene_spec.instruction)
+    policy_instruction = instruction or getattr(env_cfg, "language_instruction", scene_spec.instruction)
     env = gym.make(env_id, cfg=env_cfg)
 
     obs, _ = env.reset()
@@ -88,7 +90,7 @@ def main(
     with torch.no_grad():
         for ep in range(episodes):
             for _ in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
-                ret = client.infer(obs, instruction)
+                ret = client.infer(obs, policy_instruction)
                 if not headless:
                     cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
                     cv2.waitKey(1)
