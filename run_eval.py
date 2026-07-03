@@ -16,6 +16,8 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpo
 Finally, run the evaluation script:
 
 python run_eval.py --episodes 10 --headless
+python run_eval.py --episodes 10 --environment DROID-CanInMug --headless
+python run_eval.py --episodes 10 --environment DROID-MILA-Task1 --instruction "Pick up the spoon and place it in the sink." --headless
 """
 
 import tyro
@@ -34,7 +36,8 @@ from sim_evals.inference.droid_jointpos import Client as DroidJointPosClient
 def main(
         episodes:int = 10,
         headless: bool = True,
-        scene: int = 1,
+        environment: str = "DROID-CubeInBowl",
+        instruction: str | None = None,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -48,29 +51,21 @@ def main(
 
     # All IsaacLab dependent modules should be imported after the app is launched
     import sim_evals.environments # noqa: F401
+    from sim_evals.environments.droid_environment import get_scene_spec
     from isaaclab_tasks.utils import parse_env_cfg
 
+    scene_spec = get_scene_spec(environment)
 
     # Initialize the env
     env_cfg = parse_env_cfg(
-        "DROID",
+        environment,
         device=args_cli.device,
         num_envs=1,
         use_fabric=True,
     )
-    instruction = None
-    match scene:
-        case 1:
-            instruction = "put the cube in the bowl"
-        case 2:
-            instruction = "put the can in the mug"
-        case 3:
-            instruction = "put banana in the bin"
-        case _:
-            raise ValueError(f"Scene {scene} not supported")
-        
-    env_cfg.set_scene(scene)
-    env = gym.make("DROID", cfg=env_cfg)
+
+    policy_instruction = instruction or getattr(env_cfg, "language_instruction", scene_spec.instruction)
+    env = gym.make(environment, cfg=env_cfg)
 
     obs, _ = env.reset()
     obs, _ = env.reset() # need second render cycle to get correctly loaded materials
@@ -85,7 +80,7 @@ def main(
     with torch.no_grad():
         for ep in range(episodes):
             for _ in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
-                ret = client.infer(obs, instruction)
+                ret = client.infer(obs, policy_instruction)
                 if not headless:
                     cv2.imshow("Right Camera", cv2.cvtColor(ret["viz"], cv2.COLOR_RGB2BGR))
                     cv2.waitKey(1)

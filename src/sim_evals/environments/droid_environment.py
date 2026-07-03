@@ -2,16 +2,16 @@ import torch
 import isaaclab.sim as sim_utils
 import isaaclab.envs.mdp as mdp
 import numpy as np
+import os
 
-from typing import List
+from typing import NamedTuple
 from pathlib import Path
-from pxr import Usd, UsdPhysics
 
 from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
 from isaaclab.envs.mdp.actions.joint_actions import JointAction
 from isaaclab.utils import configclass, noise
-from isaaclab.assets import AssetBaseCfg, ArticulationCfg, RigidObjectCfg
+from isaaclab.assets import AssetBaseCfg, ArticulationCfg
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.scene import InteractiveSceneCfg
@@ -24,7 +24,98 @@ from isaaclab.sensors import CameraCfg
 
 from .nvidia_droid import NVIDIA_DROID
 
-DATA_PATH = Path(__file__).parent / "../../../assets/"
+ASSET_ROOT_ENV_VAR = "SIM_EVALS_ASSET_ROOT"
+DEFAULT_DATA_PATH = Path(__file__).resolve().parents[3] / "assets"
+
+
+class DroidSceneSpec(NamedTuple):
+    instruction: str
+    asset_paths: tuple[str, ...]
+
+
+DROID_SCENES = {
+    "DROID-CubeInBowl": DroidSceneSpec("put the cube in the bowl", ("scene1.usd",)),
+    "DROID-CanInMug": DroidSceneSpec("put the can in the mug", ("scene2.usd",)),
+    "DROID-BananaInBin": DroidSceneSpec("put banana in the bin", ("scene3.usd",)),
+    "DROID-Berkeley-Task1": DroidSceneSpec(
+        "complete the Berkeley task 1",
+        ("Berkeley/Berkeley_Task1/Scene.usd", "Berkeley_Task1/Scene.usd"),
+    ),
+    "DROID-UPenn-FrankaKitchen": DroidSceneSpec(
+        "complete the Franka kitchen task",
+        ("UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd", "TASK-1-Levine457-FrankaKitchen/Scene.usd"),
+    ),
+    "DROID-UPenn-TeaRoom": DroidSceneSpec(
+        "complete the tea room task",
+        ("UPenn/TASK-2-Levine459-TeaRoom/Scene.usd", "TASK-2-Levine459-TeaRoom/Scene.usd"),
+    ),
+    "DROID-UPenn-LivingRoom": DroidSceneSpec(
+        "complete the living room task",
+        ("UPenn/TASK-3-AGH-LivingRoom/Scene.usd", "TASK-3-AGH-LivingRoom/Scene.usd"),
+    ),
+    "DROID-UTAustin-Task1": DroidSceneSpec(
+        "complete the UT Austin task 1",
+        ("UT-Austin/UT-Austin-Task1/Scene.usd", "UT-Austin-Task1/Scene.usd"),
+    ),
+    "DROID-UTAustin-Task2": DroidSceneSpec(
+        "complete the UT Austin task 2",
+        ("UT-Austin/UT-Austin-Task2/Scene.usd", "UT-Austin-Task2/Scene.usd"),
+    ),
+    "DROID-UTAustin-Task3": DroidSceneSpec(
+        "complete the UT Austin task 3",
+        ("UT-Austin/UT-Austin-Task3/Scene.usd", "UT-Austin-Task3/Scene.usd"),
+    ),
+    "DROID-Yonsei-Task1": DroidSceneSpec(
+        "complete the Yonsei task 1",
+        ("Yonsei/Task1_20260424/Scene.usd", "Task1_20260424/Scene.usd"),
+    ),
+    "DROID-Yonsei-Task2": DroidSceneSpec(
+        "complete the Yonsei task 2",
+        ("Yonsei/Task2/Scene.usd", "Task2/Scene.usd"),
+    ),
+    "DROID-MILA-Task1": DroidSceneSpec(
+        "complete the MILA task 1",
+        ("MILA/Task1/Scene.usd", "Task1/Scene.usd"),
+    ),
+    "DROID-MILA-Task2": DroidSceneSpec(
+        "complete the MILA task 2",
+        ("MILA/Task2/Scene.usd", "Task2/Scene.usd"),
+    ),
+    "DROID-FrodoBots-Task1": DroidSceneSpec(
+        "complete the FrodoBots task 1",
+        ("FrodoBots/Task1/Scene.usd", "Task1/Scene.usd"),
+    ),
+    "DROID-FrodoBots-Task2": DroidSceneSpec(
+        "complete the FrodoBots task 2",
+        ("FrodoBots/Task2/Scene.usd", "Task2/Scene.usd"),
+    ),
+}
+
+
+def get_data_path() -> Path:
+    return Path(os.environ.get(ASSET_ROOT_ENV_VAR, DEFAULT_DATA_PATH)).expanduser().resolve()
+
+
+def resolve_scene_asset_path(scene_spec: DroidSceneSpec) -> Path:
+    candidates = [get_data_path() / asset_path for asset_path in scene_spec.asset_paths]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    candidate_text = "\n  - ".join(str(path) for path in candidates)
+    raise FileNotFoundError(
+        f"Could not find asset for {scene_spec.env_id}. Checked:\n  - {candidate_text}\n"
+        f"Set {ASSET_ROOT_ENV_VAR} to the directory containing the downloaded assets."
+    )
+
+
+def get_scene_spec(env_id: str) -> DroidSceneSpec:
+    try:
+        return DROID_SCENES[env_id]
+    except KeyError as exc:
+        valid = ", ".join(DROID_SCENES)
+        raise ValueError(f"Unknown DROID environment {env_id!r}. Valid env ids: {valid}") from exc
+
 
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -86,8 +177,10 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    def dynamic_scene(self, scene_name: str):
-        environment_path = DATA_PATH / f"scene{scene_name}.usd"
+    def dynamic_scene(self, env_id: str) -> dict:
+        scene_spec = get_scene_spec(env_id)
+        environment_path = resolve_scene_asset_path(scene_spec)
+
         scene = AssetBaseCfg(
                 prim_path="{ENV_REGEX_NS}/scene",
                 spawn = sim_utils.UsdFileCfg(
@@ -96,31 +189,11 @@ class SceneCfg(InteractiveSceneCfg):
                 )
         self.scene = scene
 
-        stage = Usd.Stage.Open(
-            str(environment_path)
-        )
-        scene_prim = stage.GetPrimAtPath("/World")
-        children = scene_prim.GetChildren()
-
-        for child in children:
-            # if rigid body
-            if not UsdPhysics.RigidBodyAPI(child):
-                continue
-
-            name = child.GetName()
-            print(f"Found rigid body: {name}")
-            pos = child.GetAttribute("xformOp:translate").Get()
-            rot = child.GetAttribute("xformOp:orient").Get()
-            rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
-            asset = RigidObjectCfg(
-                        prim_path=f"{{ENV_REGEX_NS}}/scene/{name}",
-                        spawn=None,
-                        init_state=RigidObjectCfg.InitialStateCfg(
-                            pos=pos,
-                            rot=rot,
-                        ),
-                    )
-            setattr(self, name, asset)
+        return {
+            "scene_env_id": env_id,
+            "scene_instruction": scene_spec.instruction,
+            "scene_asset_path": str(environment_path),
+        }
 
 
 class BinaryJointPositionZeroToOneAction(BinaryJointPositionAction):
@@ -305,7 +378,9 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.rerender_on_reset = True
 
     
-    def set_scene(self, scene_name: str):
-        self.scene.dynamic_scene(scene_name)
-
-
+    def set_scene(self, env_id: str):
+        scene_spec = get_scene_spec(env_id)
+        self.scene_env_id = env_id
+        self.language_instruction = scene_spec.instruction
+        scene_metadata = self.scene.dynamic_scene(env_id)
+        self.scene_asset_path = scene_metadata["scene_asset_path"]
