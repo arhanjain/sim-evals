@@ -70,6 +70,8 @@ python run_eval.py --episodes [INT] --environment DROID-CubeInBowl --headless
 
 The current scenes are also registered as individual Gym environments:
 
+All `Scene.usd` paths below are relative to `assets/` or `SIM_EVALS_ASSET_ROOT`.
+
 | Environment ID | Expected `Scene.usd` |
 | --- | --- |
 | `DROID-CubeInBowl` | `scene1.usd` |
@@ -88,27 +90,6 @@ The current scenes are also registered as individual Gym environments:
 | `DROID-MILA-Task2` | `MILA/Task2/Scene.usd` |
 | `DROID-FrodoBots-Task1` | `FrodoBots/Task1/Scene.usd` |
 | `DROID-FrodoBots-Task2` | `FrodoBots/Task2/Scene.usd` |
-
-The expected asset layout is:
-```text
-assets/
-  scene1.usd
-  scene2.usd
-  scene3.usd
-  Berkeley/Berkeley_Task1/Scene.usd
-  UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd
-  UPenn/TASK-2-Levine459-TeaRoom/Scene.usd
-  UPenn/TASK-3-AGH-LivingRoom/Scene.usd
-  UT-Austin/UT-Austin-Task1/Scene.usd
-  UT-Austin/UT-Austin-Task2/Scene.usd
-  UT-Austin/UT-Austin-Task3/Scene.usd
-  Yonsei/Task1_20260424/Scene.usd
-  Yonsei/Task2/Scene.usd
-  MILA/Task1/Scene.usd
-  MILA/Task2/Scene.usd
-  FrodoBots/Task1/Scene.usd
-  FrodoBots/Task2/Scene.usd
-```
 
 You can run a named environment directly:
 ```bash
