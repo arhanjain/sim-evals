@@ -6,13 +6,12 @@ import os
 
 from typing import NamedTuple
 from pathlib import Path
-from pxr import Usd, UsdPhysics
 
 from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
 from isaaclab.envs.mdp.actions.joint_actions import JointAction
 from isaaclab.utils import configclass, noise
-from isaaclab.assets import AssetBaseCfg, ArticulationCfg, RigidObjectCfg
+from isaaclab.assets import AssetBaseCfg, ArticulationCfg
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.scene import InteractiveSceneCfg
@@ -30,119 +29,67 @@ DEFAULT_DATA_PATH = Path(__file__).resolve().parents[3] / "assets"
 
 
 class DroidSceneSpec(NamedTuple):
-    env_id: str
-    scene_id: int
     instruction: str
     asset_paths: tuple[str, ...]
 
 
-def _spec(env_id: str, scene_id: int, instruction: str, *asset_paths: str) -> DroidSceneSpec:
-    return DroidSceneSpec(
-        env_id=env_id,
-        scene_id=scene_id,
-        instruction=instruction,
-        asset_paths=asset_paths,
-    )
-
-
 DROID_SCENES = {
-    1: _spec("DROID-CubeInBowl", 1, "put the cube in the bowl", "scene1.usd"),
-    2: _spec("DROID-CanInMug", 2, "put the can in the mug", "scene2.usd"),
-    3: _spec("DROID-BananaInBin", 3, "put banana in the bin", "scene3.usd"),
-    101: _spec(
-        "DROID-Berkeley-Task1",
-        101,
+    "DROID-CubeInBowl": DroidSceneSpec("put the cube in the bowl", ("scene1.usd",)),
+    "DROID-CanInMug": DroidSceneSpec("put the can in the mug", ("scene2.usd",)),
+    "DROID-BananaInBin": DroidSceneSpec("put banana in the bin", ("scene3.usd",)),
+    "DROID-Berkeley-Task1": DroidSceneSpec(
         "complete the Berkeley task 1",
-        "Berkeley/Berkeley_Task1/Scene.usd",
-        "Berkeley_Task1/Scene.usd",
+        ("Berkeley/Berkeley_Task1/Scene.usd", "Berkeley_Task1/Scene.usd"),
     ),
-    201: _spec(
-        "DROID-UPenn-FrankaKitchen",
-        201,
+    "DROID-UPenn-FrankaKitchen": DroidSceneSpec(
         "complete the Franka kitchen task",
-        "UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd",
-        "TASK-1-Levine457-FrankaKitchen/Scene.usd",
+        ("UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd", "TASK-1-Levine457-FrankaKitchen/Scene.usd"),
     ),
-    202: _spec(
-        "DROID-UPenn-TeaRoom",
-        202,
+    "DROID-UPenn-TeaRoom": DroidSceneSpec(
         "complete the tea room task",
-        "UPenn/TASK-2-Levine459-TeaRoom/Scene.usd",
-        "TASK-2-Levine459-TeaRoom/Scene.usd",
+        ("UPenn/TASK-2-Levine459-TeaRoom/Scene.usd", "TASK-2-Levine459-TeaRoom/Scene.usd"),
     ),
-    203: _spec(
-        "DROID-UPenn-LivingRoom",
-        203,
+    "DROID-UPenn-LivingRoom": DroidSceneSpec(
         "complete the living room task",
-        "UPenn/TASK-3-AGH-LivingRoom/Scene.usd",
-        "TASK-3-AGH-LivingRoom/Scene.usd",
+        ("UPenn/TASK-3-AGH-LivingRoom/Scene.usd", "TASK-3-AGH-LivingRoom/Scene.usd"),
     ),
-    301: _spec(
-        "DROID-UTAustin-Task1",
-        301,
+    "DROID-UTAustin-Task1": DroidSceneSpec(
         "complete the UT Austin task 1",
-        "UT-Austin/UT-Austin-Task1/Scene.usd",
-        "UT-Austin-Task1/Scene.usd",
+        ("UT-Austin/UT-Austin-Task1/Scene.usd", "UT-Austin-Task1/Scene.usd"),
     ),
-    302: _spec(
-        "DROID-UTAustin-Task2",
-        302,
+    "DROID-UTAustin-Task2": DroidSceneSpec(
         "complete the UT Austin task 2",
-        "UT-Austin/UT-Austin-Task2/Scene.usd",
-        "UT-Austin-Task2/Scene.usd",
+        ("UT-Austin/UT-Austin-Task2/Scene.usd", "UT-Austin-Task2/Scene.usd"),
     ),
-    303: _spec(
-        "DROID-UTAustin-Task3",
-        303,
+    "DROID-UTAustin-Task3": DroidSceneSpec(
         "complete the UT Austin task 3",
-        "UT-Austin/UT-Austin-Task3/Scene.usd",
-        "UT-Austin-Task3/Scene.usd",
+        ("UT-Austin/UT-Austin-Task3/Scene.usd", "UT-Austin-Task3/Scene.usd"),
     ),
-    401: _spec(
-        "DROID-Yonsei-Task1",
-        401,
+    "DROID-Yonsei-Task1": DroidSceneSpec(
         "complete the Yonsei task 1",
-        "Yonsei/Task1_20260424/Scene.usd",
-        "Task1_20260424/Scene.usd",
+        ("Yonsei/Task1_20260424/Scene.usd", "Task1_20260424/Scene.usd"),
     ),
-    402: _spec(
-        "DROID-Yonsei-Task2",
-        402,
+    "DROID-Yonsei-Task2": DroidSceneSpec(
         "complete the Yonsei task 2",
-        "Yonsei/Task2/Scene.usd",
-        "Task2/Scene.usd",
+        ("Yonsei/Task2/Scene.usd", "Task2/Scene.usd"),
     ),
-    501: _spec(
-        "DROID-MILA-Task1",
-        501,
+    "DROID-MILA-Task1": DroidSceneSpec(
         "complete the MILA task 1",
-        "MILA/Task1/Scene.usd",
-        "Task1/Scene.usd",
+        ("MILA/Task1/Scene.usd", "Task1/Scene.usd"),
     ),
-    502: _spec(
-        "DROID-MILA-Task2",
-        502,
+    "DROID-MILA-Task2": DroidSceneSpec(
         "complete the MILA task 2",
-        "MILA/Task2/Scene.usd",
-        "Task2/Scene.usd",
+        ("MILA/Task2/Scene.usd", "Task2/Scene.usd"),
     ),
-    601: _spec(
-        "DROID-FrodoBots-Task1",
-        601,
+    "DROID-FrodoBots-Task1": DroidSceneSpec(
         "complete the FrodoBots task 1",
-        "FrodoBots/Task1/Scene.usd",
-        "Task1/Scene.usd",
+        ("FrodoBots/Task1/Scene.usd", "Task1/Scene.usd"),
     ),
-    602: _spec(
-        "DROID-FrodoBots-Task2",
-        602,
+    "DROID-FrodoBots-Task2": DroidSceneSpec(
         "complete the FrodoBots task 2",
-        "FrodoBots/Task2/Scene.usd",
-        "Task2/Scene.usd",
+        ("FrodoBots/Task2/Scene.usd", "Task2/Scene.usd"),
     ),
 }
-
-ENV_ID_TO_SCENE = {spec.env_id: spec for spec in DROID_SCENES.values()}
 
 
 def get_data_path() -> Path:
@@ -162,70 +109,12 @@ def resolve_scene_asset_path(scene_spec: DroidSceneSpec) -> Path:
     )
 
 
-def get_scene_spec(scene: int | str) -> DroidSceneSpec:
-    if isinstance(scene, str):
-        if scene.isdigit():
-            scene = int(scene)
-        elif scene in ENV_ID_TO_SCENE:
-            return ENV_ID_TO_SCENE[scene]
-        else:
-            valid = ", ".join(spec.env_id for spec in DROID_SCENES.values())
-            raise ValueError(f"Unknown DROID scene {scene!r}. Valid env ids: {valid}")
-
+def get_scene_spec(env_id: str) -> DroidSceneSpec:
     try:
-        return DROID_SCENES[int(scene)]
-    except (KeyError, ValueError) as exc:
-        valid = ", ".join(str(scene_id) for scene_id in DROID_SCENES)
-        raise ValueError(f"Unknown DROID scene {scene!r}. Valid scene ids: {valid}") from exc
-
-
-def _relative_scene_prim_path(stage: Usd.Stage, prim: Usd.Prim) -> str:
-    prim_path = str(prim.GetPath())
-    default_prim = stage.GetDefaultPrim()
-    root_candidates = []
-    if default_prim and default_prim.IsValid():
-        root_candidates.append(str(default_prim.GetPath()))
-    root_candidates.append("/World")
-
-    for root_path in root_candidates:
-        if prim_path == root_path:
-            return ""
-        if prim_path.startswith(f"{root_path}/"):
-            return prim_path[len(root_path):]
-
-    return prim_path
-
-
-def _scene_attr_name(relative_prim_path: str, used_names: set[str]) -> str:
-    name = relative_prim_path.strip("/").replace("/", "_") or "object"
-    name = "".join(char if char.isalnum() or char == "_" else "_" for char in name)
-    if name[0].isdigit():
-        name = f"object_{name}"
-
-    base_name = name
-    suffix = 2
-    while name in used_names:
-        name = f"{base_name}_{suffix}"
-        suffix += 1
-    used_names.add(name)
-    return name
-
-
-def _rigid_body_initial_state(prim: Usd.Prim) -> RigidObjectCfg.InitialStateCfg:
-    pos_attr = prim.GetAttribute("xformOp:translate")
-    rot_attr = prim.GetAttribute("xformOp:orient")
-    pos = pos_attr.Get() if pos_attr and pos_attr.HasAuthoredValueOpinion() else (0.0, 0.0, 0.0)
-    rot_value = rot_attr.Get() if rot_attr and rot_attr.HasAuthoredValueOpinion() else None
-    if rot_value is None:
-        rot = (1.0, 0.0, 0.0, 0.0)
-    else:
-        rot = (
-            rot_value.GetReal(),
-            rot_value.GetImaginary()[0],
-            rot_value.GetImaginary()[1],
-            rot_value.GetImaginary()[2],
-        )
-    return RigidObjectCfg.InitialStateCfg(pos=pos, rot=rot)
+        return DROID_SCENES[env_id]
+    except KeyError as exc:
+        valid = ", ".join(DROID_SCENES)
+        raise ValueError(f"Unknown DROID environment {env_id!r}. Valid env ids: {valid}") from exc
 
 
 @configclass
@@ -288,8 +177,8 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    def dynamic_scene(self, scene_name: int | str) -> dict:
-        scene_spec = get_scene_spec(scene_name)
+    def dynamic_scene(self, env_id: str) -> dict:
+        scene_spec = get_scene_spec(env_id)
         environment_path = resolve_scene_asset_path(scene_spec)
 
         scene = AssetBaseCfg(
@@ -299,51 +188,11 @@ class SceneCfg(InteractiveSceneCfg):
                     ),
                 )
         self.scene = scene
-        scene_object_names = []
-        scene_objects = {}
-
-        if scene_spec.scene_id > 3:
-            return {
-                "scene_id": scene_spec.scene_id,
-                "scene_env_id": scene_spec.env_id,
-                "scene_instruction": scene_spec.instruction,
-                "scene_asset_path": str(environment_path),
-                "scene_object_names": scene_object_names,
-                "scene_objects": scene_objects,
-            }
-
-        stage = Usd.Stage.Open(
-            str(environment_path)
-        )
-        if stage is None:
-            raise RuntimeError(f"Failed to open DROID scene asset: {environment_path}")
-
-        used_object_names = set()
-        for child in stage.Traverse():
-            if not UsdPhysics.RigidBodyAPI(child):
-                continue
-
-            relative_prim_path = _relative_scene_prim_path(stage, child)
-            if not relative_prim_path:
-                continue
-
-            name = _scene_attr_name(relative_prim_path, used_object_names)
-            scene_object_names.append(name)
-            asset = RigidObjectCfg(
-                        prim_path=f"{{ENV_REGEX_NS}}/scene{relative_prim_path}",
-                        spawn=None,
-                        init_state=_rigid_body_initial_state(child),
-                    )
-            setattr(self, name, asset)
-            scene_objects[name] = asset
 
         return {
-            "scene_id": scene_spec.scene_id,
-            "scene_env_id": scene_spec.env_id,
+            "scene_env_id": env_id,
             "scene_instruction": scene_spec.instruction,
             "scene_asset_path": str(environment_path),
-            "scene_object_names": scene_object_names,
-            "scene_objects": scene_objects,
         }
 
 
@@ -529,50 +378,9 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.rerender_on_reset = True
 
     
-    def set_scene(self, scene_name: int | str):
-        scene_spec = get_scene_spec(scene_name)
-        self.scene_id = scene_spec.scene_id
-        self.scene_env_id = scene_spec.env_id
+    def set_scene(self, env_id: str):
+        scene_spec = get_scene_spec(env_id)
+        self.scene_env_id = env_id
         self.language_instruction = scene_spec.instruction
-        scene_metadata = self.scene.dynamic_scene(scene_spec.scene_id)
+        scene_metadata = self.scene.dynamic_scene(env_id)
         self.scene_asset_path = scene_metadata["scene_asset_path"]
-        self.scene_object_names = scene_metadata["scene_object_names"]
-        self.scene_objects = scene_metadata["scene_objects"]
-
-
-@configclass
-class CubeInBowlEnvCfg(EnvCfg):
-    def __post_init__(self):
-        super().__post_init__()
-        self.set_scene(1)
-
-
-@configclass
-class CanInMugEnvCfg(EnvCfg):
-    def __post_init__(self):
-        super().__post_init__()
-        self.set_scene(2)
-
-
-@configclass
-class BananaInBinEnvCfg(EnvCfg):
-    def __post_init__(self):
-        super().__post_init__()
-        self.set_scene(3)
-
-
-def make_env_cfg_class(scene_name: int | str) -> type[EnvCfg]:
-    scene_spec = get_scene_spec(scene_name)
-
-    @configclass
-    class DroidSceneEnvCfg(EnvCfg):
-        def __post_init__(self):
-            super().__post_init__()
-            self.set_scene(scene_spec.env_id)
-
-    class_name = f"{scene_spec.env_id.replace('-', '')}EnvCfg"
-    DroidSceneEnvCfg.__name__ = class_name
-    DroidSceneEnvCfg.__qualname__ = class_name
-    return DroidSceneEnvCfg
-
-

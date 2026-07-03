@@ -65,29 +65,50 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 uv run scripts/serve_policy.py policy:checkpo
 
 Finally, run the evaluation script:
 ```bash
-python run_eval.py --episodes [INT] --scene [INT] --headless
+python run_eval.py --episodes [INT] --environment DROID-CubeInBowl --headless
 ```
 
 The current scenes are also registered as individual Gym environments:
 
-| Environment ID | Scene id | Expected `Scene.usd` |
-| --- | --- | --- |
-| `DROID-CubeInBowl` | `1` | `scene1.usd` |
-| `DROID-CanInMug` | `2` | `scene2.usd` |
-| `DROID-BananaInBin` | `3` | `scene3.usd` |
-| `DROID-Berkeley-Task1` | `101` | `Berkeley/Berkeley_Task1/Scene.usd` |
-| `DROID-UPenn-FrankaKitchen` | `201` | `UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd` |
-| `DROID-UPenn-TeaRoom` | `202` | `UPenn/TASK-2-Levine459-TeaRoom/Scene.usd` |
-| `DROID-UPenn-LivingRoom` | `203` | `UPenn/TASK-3-AGH-LivingRoom/Scene.usd` |
-| `DROID-UTAustin-Task1` | `301` | `UT-Austin/UT-Austin-Task1/Scene.usd` |
-| `DROID-UTAustin-Task2` | `302` | `UT-Austin/UT-Austin-Task2/Scene.usd` |
-| `DROID-UTAustin-Task3` | `303` | `UT-Austin/UT-Austin-Task3/Scene.usd` |
-| `DROID-Yonsei-Task1` | `401` | `Yonsei/Task1_20260424/Scene.usd` |
-| `DROID-Yonsei-Task2` | `402` | `Yonsei/Task2/Scene.usd` |
-| `DROID-MILA-Task1` | `501` | `MILA/Task1/Scene.usd` |
-| `DROID-MILA-Task2` | `502` | `MILA/Task2/Scene.usd` |
-| `DROID-FrodoBots-Task1` | `601` | `FrodoBots/Task1/Scene.usd` |
-| `DROID-FrodoBots-Task2` | `602` | `FrodoBots/Task2/Scene.usd` |
+| Environment ID | Expected `Scene.usd` |
+| --- | --- |
+| `DROID-CubeInBowl` | `scene1.usd` |
+| `DROID-CanInMug` | `scene2.usd` |
+| `DROID-BananaInBin` | `scene3.usd` |
+| `DROID-Berkeley-Task1` | `Berkeley/Berkeley_Task1/Scene.usd` |
+| `DROID-UPenn-FrankaKitchen` | `UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd` |
+| `DROID-UPenn-TeaRoom` | `UPenn/TASK-2-Levine459-TeaRoom/Scene.usd` |
+| `DROID-UPenn-LivingRoom` | `UPenn/TASK-3-AGH-LivingRoom/Scene.usd` |
+| `DROID-UTAustin-Task1` | `UT-Austin/UT-Austin-Task1/Scene.usd` |
+| `DROID-UTAustin-Task2` | `UT-Austin/UT-Austin-Task2/Scene.usd` |
+| `DROID-UTAustin-Task3` | `UT-Austin/UT-Austin-Task3/Scene.usd` |
+| `DROID-Yonsei-Task1` | `Yonsei/Task1_20260424/Scene.usd` |
+| `DROID-Yonsei-Task2` | `Yonsei/Task2/Scene.usd` |
+| `DROID-MILA-Task1` | `MILA/Task1/Scene.usd` |
+| `DROID-MILA-Task2` | `MILA/Task2/Scene.usd` |
+| `DROID-FrodoBots-Task1` | `FrodoBots/Task1/Scene.usd` |
+| `DROID-FrodoBots-Task2` | `FrodoBots/Task2/Scene.usd` |
+
+The expected asset layout is:
+```text
+assets/
+  scene1.usd
+  scene2.usd
+  scene3.usd
+  Berkeley/Berkeley_Task1/Scene.usd
+  UPenn/TASK-1-Levine457-FrankaKitchen/Scene.usd
+  UPenn/TASK-2-Levine459-TeaRoom/Scene.usd
+  UPenn/TASK-3-AGH-LivingRoom/Scene.usd
+  UT-Austin/UT-Austin-Task1/Scene.usd
+  UT-Austin/UT-Austin-Task2/Scene.usd
+  UT-Austin/UT-Austin-Task3/Scene.usd
+  Yonsei/Task1_20260424/Scene.usd
+  Yonsei/Task2/Scene.usd
+  MILA/Task1/Scene.usd
+  MILA/Task2/Scene.usd
+  FrodoBots/Task1/Scene.usd
+  FrodoBots/Task2/Scene.usd
+```
 
 You can run a named environment directly:
 ```bash
@@ -102,8 +123,7 @@ python run_eval.py --episodes [INT] --environment DROID-MILA-Task1 --instruction
 ## Minimal Example
 
 ```python
-env_cfg.set_scene(scene) # pass scene integer
-env = gym.make("DROID", cfg=env_cfg)
+env = gym.make("DROID-CubeInBowl", cfg=env_cfg)
 
 obs, _ = env.reset()
 obs, _ = env.reset() # need second render cycle to get correctly loaded materials

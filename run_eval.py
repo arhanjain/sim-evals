@@ -36,8 +36,7 @@ from sim_evals.inference.droid_jointpos import Client as DroidJointPosClient
 def main(
         episodes:int = 10,
         headless: bool = True,
-        scene: int = 1,
-        environment: str | None = None,
+        environment: str = "DROID-CubeInBowl",
         instruction: str | None = None,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
@@ -55,27 +54,18 @@ def main(
     from sim_evals.environments.droid_environment import get_scene_spec
     from isaaclab_tasks.utils import parse_env_cfg
 
-    if environment is None:
-        scene_spec = get_scene_spec(scene)
-        env_id = scene_spec.env_id
-    elif environment == "DROID":
-        scene_spec = get_scene_spec(scene)
-        env_id = environment
-    else:
-        scene_spec = get_scene_spec(environment)
-        env_id = scene_spec.env_id
+    scene_spec = get_scene_spec(environment)
 
     # Initialize the env
     env_cfg = parse_env_cfg(
-        env_id,
+        environment,
         device=args_cli.device,
         num_envs=1,
         use_fabric=True,
     )
 
-    env_cfg.set_scene(scene_spec.scene_id)
     policy_instruction = instruction or getattr(env_cfg, "language_instruction", scene_spec.instruction)
-    env = gym.make(env_id, cfg=env_cfg)
+    env = gym.make(environment, cfg=env_cfg)
 
     obs, _ = env.reset()
     obs, _ = env.reset() # need second render cycle to get correctly loaded materials
