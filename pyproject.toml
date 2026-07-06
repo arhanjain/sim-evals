@@ -18,6 +18,9 @@ override-dependencies = [
   "websockets>=16.0"
 ]
 
+[tool.uv.extra-build-dependencies]
+flatdict = ["setuptools<71"]
+
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },

@@ -24,6 +24,7 @@ import gymnasium as gym
 import torch
 import cv2
 import mediapy
+import json
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -35,6 +36,8 @@ def main(
         episodes:int = 10,
         headless: bool = True,
         scene: int = 1,
+        env_id: str = "DROID",
+        task_id: str | None = None,
         ):
     # launch omniverse app with arguments (inside function to prevent overriding tyro)
     from isaaclab.app import AppLauncher
@@ -53,24 +56,46 @@ def main(
 
     # Initialize the env
     env_cfg = parse_env_cfg(
-        "DROID",
+        env_id,
         device=args_cli.device,
         num_envs=1,
         use_fabric=True,
     )
     instruction = None
-    match scene:
-        case 1:
-            instruction = "put the cube in the bowl"
-        case 2:
-            instruction = "put the can in the mug"
-        case 3:
-            instruction = "put banana in the bin"
-        case _:
-            raise ValueError(f"Scene {scene} not supported")
-        
-    env_cfg.set_scene(scene)
-    env = gym.make("DROID", cfg=env_cfg)
+    task_metadata = None
+    if env_id == "MILA-DROID":
+        from sim_evals.environments.mila.tasks import get_mila_task
+
+        if task_id is None:
+            task_id = "place_spoon_in_sink"
+        task = get_mila_task(task_id)
+        instruction = task.language_instruction
+        task_metadata = {
+            "institution": task.institution,
+            "task_id": task.task_id,
+            "scene_asset": task.scene_asset,
+            "language_instruction": task.language_instruction,
+            "success_criteria": task.success_criteria,
+            "max_timesteps": task.max_timesteps,
+            "milestones": [
+                {"name": milestone.name, "description": milestone.description}
+                for milestone in task.milestones
+            ],
+        }
+        env_cfg.set_task(task.task_id)
+    else:
+        match scene:
+            case 1:
+                instruction = "put the cube in the bowl"
+            case 2:
+                instruction = "put the can in the mug"
+            case 3:
+                instruction = "put banana in the bin"
+            case _:
+                raise ValueError(f"Scene {scene} not supported")
+        env_cfg.set_scene(scene)
+
+    env = gym.make(env_id, cfg=env_cfg)
 
     obs, _ = env.reset()
     obs, _ = env.reset() # need second render cycle to get correctly loaded materials
@@ -79,11 +104,15 @@ def main(
 
     video_dir = Path("runs") / datetime.now().strftime("%Y-%m-%d") / datetime.now().strftime("%H-%M-%S")
     video_dir.mkdir(parents=True, exist_ok=True)
+    if task_metadata is not None:
+        with open(video_dir / "task.json", "w") as f:
+            json.dump(task_metadata, f, indent=2)
     video = []
     ep = 0
     max_steps = env.env.max_episode_length
     with torch.no_grad():
         for ep in range(episodes):
+            episode_reward = 0.0
             for _ in tqdm(range(max_steps), desc=f"Episode {ep+1}/{episodes}"):
                 ret = client.infer(obs, instruction)
                 if not headless:
@@ -91,7 +120,8 @@ def main(
                     cv2.waitKey(1)
                 video.append(ret["viz"])
                 action = torch.tensor(ret["action"])[None]
-                obs, _, term, trunc, _ = env.step(action)
+                obs, reward, term, trunc, _ = env.step(action)
+                episode_reward += float(reward[0].detach().cpu().item())
                 if term or trunc:
                     break
 
@@ -101,6 +131,19 @@ def main(
                 video,
                 fps=15,
             )
+            if task_metadata is not None:
+                with open(video_dir / f"episode_{ep}.json", "w") as f:
+                    json.dump(
+                        {
+                            **task_metadata,
+                            "episode": ep,
+                            "milestone_reward": episode_reward,
+                            "success": None,
+                            "highest_milestone_reached": None,
+                        },
+                        f,
+                        indent=2,
+                    )
             video = []
 
     env.close()
