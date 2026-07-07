@@ -7,7 +7,9 @@ from isaaclab.envs import ManagerBasedRLEnv
 from .geometry import (
     get_gripper_open,
     get_gripper_pos,
+    get_object_point_pos,
     get_object_pos,
+    get_target_point_pos,
     get_target_pos,
     object_keypoints_inside_target_region,
 )
@@ -71,12 +73,47 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
         (object_to_target_xy < task.target_xy_radius)
         & (object_pos[:, 2] > target_pos[:, 2] + task.above_target_height)
     )
+    above_target_surface = above_target
+    if task.target_top_center is not None:
+        target_top_center = get_target_point_pos(env, task.target_top_center)
+        object_to_target_top_xy = torch.linalg.norm(
+            object_pos[:, :2] - target_top_center[:, :2],
+            dim=1,
+        )
+        above_target_surface = (
+            (object_to_target_top_xy < task.target_xy_radius)
+            & (object_pos[:, 2] > target_top_center[:, 2])
+        )
     above_target_anywhere = object_pos[:, 2] > target_pos[:, 2] + task.above_target_height
+    above_grey_bowl = above_target_anywhere
+    if task.object_bottom_center is not None and task.target_bottom_center is not None:
+        object_bottom_center = get_object_point_pos(env, task.object_bottom_center)
+        target_bottom_center = get_target_point_pos(env, task.target_bottom_center)
+        object_to_target_bottom_xy = torch.linalg.norm(
+            object_bottom_center[:, :2] - target_bottom_center[:, :2],
+            dim=1,
+        )
+        above_grey_bowl = above_target_anywhere & (
+            object_to_target_bottom_xy < task.target_xy_radius
+        )
     in_target = (
         (object_to_target_xy < task.target_xy_radius)
         & (object_pos[:, 2] < target_pos[:, 2] + task.in_target_height)
         & gripper_open
     )
+    in_target_surface = in_target
+    if task.target_bottom_center is not None:
+        target_bottom_center = get_target_point_pos(env, task.target_bottom_center)
+        in_target_xy_radius = task.in_target_xy_radius or task.target_xy_radius
+        object_to_target_bottom_xy = torch.linalg.norm(
+            object_pos[:, :2] - target_bottom_center[:, :2],
+            dim=1,
+        )
+        in_target_surface = (
+            (object_to_target_bottom_xy < in_target_xy_radius)
+            & (object_pos[:, 2] < target_bottom_center[:, 2] + task.in_target_height)
+            & gripper_open
+        )
 
     reached_object = object_to_gripper < task.reach_distance
     object_inside_target_region = object_keypoints_inside_target_region(env, task)
@@ -84,12 +121,12 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     return {
         "reached_spoon": reached_object,
         "lifted_up_spoon": lifted,
-        "above_sink": above_target,
-        "completely_in_sink": in_target,
-        "above_utensil_holder": above_target,
-        "released_in_utensil_holder": in_target,
+        "above_sink": above_target_surface,
+        "completely_in_sink": in_target_surface,
+        "above_utensil_holder": above_target_surface,
+        "released_in_utensil_holder": in_target_surface,
         "reached_red_bowl": reached_object,
         "lifted_up_red_bowl": lifted,
-        "above_grey_bowl": above_target_anywhere,
+        "above_grey_bowl": above_grey_bowl,
         "placed_in_grey_bowl": object_inside_target_region & gripper_open,
     }

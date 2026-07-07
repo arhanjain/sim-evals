@@ -22,6 +22,8 @@ class MilaTask:
     target_name: str
     object_prim_path: str
     target_prim_path: str
+    target_top_center: tuple[float, float, float] | None = None
+    target_bottom_center: tuple[float, float, float] | None = None
     object_bottom_center: tuple[float, float, float] | None = None
     object_mouth_center: tuple[float, float, float] | None = None
     target_region_prim_path: str | None = None
@@ -33,6 +35,7 @@ class MilaTask:
     target_xy_radius: float = 0.18
     above_target_height: float = 0.08
     in_target_height: float = 0.05
+    in_target_xy_radius: float | None = None
     release_gripper_threshold: float = 0.5
 
 
@@ -68,7 +71,11 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="sink",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Sink081/Sink081",
+        target_top_center=(0.0, 0.0, 0.19044651),
+        target_bottom_center=(0.0, 0.0, -0.19044651),
         reach_distance=0.20,
+        target_xy_radius=0.10,
+        in_target_xy_radius=0.15,
     ),
     "place_spoon_in_utensil_holder": MilaTask(
         institution="MILA",
@@ -104,10 +111,12 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="utensil_holder",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Bowl060/Bowl060",
+        target_top_center=(0.0, 0.0, 0.2589967),
+        target_bottom_center=(0.0, 0.0, -0.08577694),
         reach_distance=0.20,
-        target_xy_radius=0.16,
-        above_target_height=0.10,
-        in_target_height=0.12,
+        target_xy_radius=0.05,
+        in_target_height=0.05,
+        in_target_xy_radius=0.05,
     ),
     "stack_red_bowl_into_grey_bowl": MilaTask(
         institution="MILA",
@@ -138,15 +147,16 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="grey_bowl",
         object_prim_path="Bowl061/Bowl061",
         target_prim_path="Bowl062/Bowl062",
+        target_bottom_center=(0.0, 0.0, -0.040000003),
         reach_distance=0.12,
-        object_bottom_center=(0.0, 0.0, -0.030),
-        object_mouth_center=(0.0, 0.0, 0.030),
+        object_bottom_center=(0.0, 0.0, -0.029655244),
+        object_mouth_center=(0.0, 0.0, 0.029655248),
         target_region_prim_path="Bowl062/Bowl062/Sites/bowl_liquid",
         target_region_extent_min=(-0.089, -0.089, -0.034),
         target_region_extent_max=(0.089, 0.089, 0.034),
         target_region_tolerance=0.01,
         lift_height=0.05,
-        target_xy_radius=0.18,
+        target_xy_radius=0.10,
         above_target_height=0.08,
         in_target_height=0.08,
     ),

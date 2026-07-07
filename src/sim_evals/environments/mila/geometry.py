@@ -54,6 +54,20 @@ def get_target_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
     return env.scene[task.target_name].data.root_pos_w
 
 
+def get_object_point_pos(env: ManagerBasedRLEnv, local_point: tuple[float, float, float]) -> torch.Tensor:
+    object_pos = get_object_pos(env)
+    object_quat = get_object_quat(env)
+    point = torch.tensor(local_point, device=env.device, dtype=object_pos.dtype)
+    return object_pos + quat_rotate(object_quat, point.expand_as(object_pos))
+
+
+def get_target_point_pos(env: ManagerBasedRLEnv, local_point: tuple[float, float, float]) -> torch.Tensor:
+    target_pos = get_target_pos(env)
+    target_quat = get_target_quat(env)
+    point = torch.tensor(local_point, device=env.device, dtype=target_pos.dtype)
+    return target_pos + quat_rotate(target_quat, point.expand_as(target_pos))
+
+
 def get_gripper_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
     robot = env.scene["robot"]
     candidate_names = ("base_link", "panda_hand", "panda_link8")
