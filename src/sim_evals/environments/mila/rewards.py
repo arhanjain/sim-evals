@@ -57,7 +57,7 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     target_pos = _target_pos(env)
     gripper_open = _gripper_open(env, task.release_gripper_threshold)
 
-    object_to_gripper = _gripper_object_bbox_distance(env, task)
+    object_to_gripper = _gripper_object_distance(env, task)
     object_to_target_xy = torch.linalg.norm(object_pos[:, :2] - target_pos[:, :2], dim=1)
     lifted = object_pos[:, 2] > env._mila_initial_object_z + task.lift_height
     above_target = (
@@ -88,8 +88,8 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     }
 
 
-def _gripper_object_bbox_distance(env: ManagerBasedRLEnv, task) -> torch.Tensor:
-    if task.object_bbox_half_extents is None:
+def _gripper_object_distance(env: ManagerBasedRLEnv, task) -> torch.Tensor:
+    if task.reach_uses_object_center or task.object_bbox_half_extents is None:
         return torch.linalg.norm(_object_pos(env) - _gripper_pos(env), dim=1)
 
     fingertip_pos = _gripper_fingertip_pos(env)

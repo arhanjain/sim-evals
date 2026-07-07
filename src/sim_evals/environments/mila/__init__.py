@@ -1,7 +1,7 @@
 import gymnasium as gym
 from isaaclab.envs import ManagerBasedRLEnv
 
-from .droid_environment import MilaDroidEnvCfg
+from .mila_droid_environment import MilaDroidEnvCfg
 
 
 gym.register(
