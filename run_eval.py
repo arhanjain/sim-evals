@@ -24,7 +24,6 @@ import gymnasium as gym
 import torch
 import cv2
 import mediapy
-import json
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
@@ -62,7 +61,6 @@ def main(
         use_fabric=True,
     )
     instruction = None
-    task_metadata = None
     if env_id == "DROID-MILA":
         from sim_evals.environments.mila.tasks import MILA_TASKS, get_mila_task
 
@@ -73,18 +71,6 @@ def main(
             )
         task = get_mila_task(task_id)
         instruction = task.language_instruction
-        task_metadata = {
-            "institution": task.institution,
-            "task_id": task.task_id,
-            "scene_asset": task.scene_asset,
-            "language_instruction": task.language_instruction,
-            "success_criteria": task.success_criteria,
-            "max_timesteps": task.max_timesteps,
-            "milestones": [
-                {"name": milestone.name, "description": milestone.description}
-                for milestone in task.milestones
-            ],
-        }
         env_cfg.set_task(task.task_id)
     else:
         match scene:
@@ -107,9 +93,6 @@ def main(
 
     video_dir = Path("runs") / datetime.now().strftime("%Y-%m-%d") / datetime.now().strftime("%H-%M-%S")
     video_dir.mkdir(parents=True, exist_ok=True)
-    if task_metadata is not None:
-        with open(video_dir / "task.json", "w") as f:
-            json.dump(task_metadata, f, indent=2)
     video = []
     ep = 0
     max_steps = env.env.max_episode_length
@@ -134,19 +117,6 @@ def main(
                 video,
                 fps=15,
             )
-            if task_metadata is not None:
-                with open(video_dir / f"episode_{ep}.json", "w") as f:
-                    json.dump(
-                        {
-                            **task_metadata,
-                            "episode": ep,
-                            "auto_milestone_reward": episode_reward,
-                            "highest_milestone": None,
-                            "task_complete": None,
-                        },
-                        f,
-                        indent=2,
-                    )
             video = []
 
     env.close()
