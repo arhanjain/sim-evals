@@ -18,8 +18,6 @@ override-dependencies = [
   "websockets>=16.0"
 ]
 
-[tool.uv.extra-build-dependencies]
-flatdict = ["setuptools<71"]
 
 [tool.uv.sources]
 torch = [
