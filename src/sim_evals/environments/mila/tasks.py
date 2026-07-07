@@ -23,16 +23,18 @@ class MilaTask:
     object_prim_path: str
     target_prim_path: str
     object_bbox_half_extents: tuple[float, float, float] | None = None
+    object_bottom_center: tuple[float, float, float] | None = None
+    object_mouth_center: tuple[float, float, float] | None = None
     target_region_prim_path: str | None = None
     target_region_extent_min: tuple[float, float, float] | None = None
     target_region_extent_max: tuple[float, float, float] | None = None
     target_region_tolerance: float = 0.01
-    reach_distance: float = 0.07
+    reach_distance: float = 0.03
     lift_height: float = 0.05
     target_xy_radius: float = 0.18
     above_target_height: float = 0.08
     in_target_height: float = 0.05
-    release_gripper_threshold: float = 0.2
+    release_gripper_threshold: float = 0.5
 
 
 MILA_TASKS: dict[str, MilaTask] = {
@@ -138,11 +140,12 @@ MILA_TASKS: dict[str, MilaTask] = {
         object_prim_path="Bowl061/Bowl061",
         target_prim_path="Bowl062/Bowl062",
         object_bbox_half_extents=(0.079, 0.079, 0.030),
+        object_bottom_center=(0.0, 0.0, -0.030),
+        object_mouth_center=(0.0, 0.0, 0.030),
         target_region_prim_path="Bowl062/Bowl062/Sites/bowl_liquid",
         target_region_extent_min=(-0.089, -0.089, -0.034),
         target_region_extent_max=(0.089, 0.089, 0.034),
         target_region_tolerance=0.01,
-        reach_distance=0.08,
         lift_height=0.05,
         target_xy_radius=0.18,
         above_target_height=0.08,
