@@ -67,6 +67,7 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="sink",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Sink081/Sink081",
+        object_bbox_half_extents=(0.039, 0.181, 0.034),
     ),
     "place_spoon_in_utensil_holder": MilaTask(
         institution="MILA",
@@ -102,6 +103,7 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="utensil_holder",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Cup082/Cup082",
+        object_bbox_half_extents=(0.039, 0.181, 0.034),
         target_xy_radius=0.16,
         above_target_height=0.10,
         in_target_height=0.12,

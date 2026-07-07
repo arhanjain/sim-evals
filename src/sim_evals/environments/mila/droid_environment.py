@@ -18,10 +18,11 @@ from sim_evals.environments.droid_environment import (
 )
 
 from .rewards import milestone_reward, reset_milestones
-from .tasks import get_mila_task
+from .tasks import MilaTask, get_mila_task
 
 
 MILA_ASSET_PATH = DATA_PATH / "mila"
+DEFAULT_TASK_ID = "place_spoon_in_sink"
 
 
 @configclass
@@ -29,9 +30,9 @@ class MilaSceneCfg(DroidSceneCfg):
     def dynamic_task_scene(self, task_id: str):
         task = get_mila_task(task_id)
         environment_path = MILA_ASSET_PATH / task.scene_asset
-        self._load_scene_usd(environment_path, task_id)
+        self._load_scene_usd(environment_path, task)
 
-    def _load_scene_usd(self, environment_path: Path, task_id: str):
+    def _load_scene_usd(self, environment_path: Path, task: MilaTask):
         scene = AssetBaseCfg(
             prim_path="{ENV_REGEX_NS}/scene",
             spawn=sim_utils.UsdFileCfg(usd_path=str(environment_path)),
@@ -42,7 +43,6 @@ class MilaSceneCfg(DroidSceneCfg):
         if stage is None:
             raise FileNotFoundError(f"Could not open MILA scene asset: {environment_path}")
 
-        task = get_mila_task(task_id)
         self._register_rigid_body(stage, task.object_name, task.object_prim_path)
         self._register_rigid_body(stage, task.target_name, task.target_prim_path)
 
@@ -70,7 +70,7 @@ class MilaRewardsCfg:
     milestones = RewTerm(
         func=milestone_reward,
         weight=1.0,
-        params={"task_id": "place_spoon_in_sink"},
+        params={"task_id": DEFAULT_TASK_ID},
     )
 
 
@@ -85,7 +85,7 @@ class MilaDroidEnvCfg(DroidEnvCfg):
     scene = MilaSceneCfg(num_envs=1, env_spacing=7.0)
     rewards = MilaRewardsCfg()
     events = MilaEventCfg()
-    task_id = "place_spoon_in_sink"
+    task_id = DEFAULT_TASK_ID
 
     def set_task(self, task_id: str):
         task = get_mila_task(task_id)
