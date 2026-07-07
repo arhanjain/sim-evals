@@ -29,9 +29,9 @@ class MilaSceneCfg(DroidSceneCfg):
     def dynamic_task_scene(self, task_id: str):
         task = get_mila_task(task_id)
         environment_path = MILA_ASSET_PATH / task.scene_asset
-        self._load_scene_usd(environment_path)
+        self._load_scene_usd(environment_path, task_id)
 
-    def _load_scene_usd(self, environment_path: Path):
+    def _load_scene_usd(self, environment_path: Path, task_id: str):
         scene = AssetBaseCfg(
             prim_path="{ENV_REGEX_NS}/scene",
             spawn=sim_utils.UsdFileCfg(usd_path=str(environment_path)),
@@ -42,22 +42,27 @@ class MilaSceneCfg(DroidSceneCfg):
         if stage is None:
             raise FileNotFoundError(f"Could not open MILA scene asset: {environment_path}")
 
-        scene_prim = stage.GetPrimAtPath("/World")
-        for child in scene_prim.GetChildren():
-            if not UsdPhysics.RigidBodyAPI(child):
-                continue
+        task = get_mila_task(task_id)
+        self._register_rigid_body(stage, task.object_name, task.object_prim_path)
+        self._register_rigid_body(stage, task.target_name, task.target_prim_path)
 
-            name = child.GetName()
-            print(f"Found rigid body: {name}")
-            pos = child.GetAttribute("xformOp:translate").Get()
-            rot = child.GetAttribute("xformOp:orient").Get()
-            rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
-            asset = RigidObjectCfg(
-                prim_path=f"{{ENV_REGEX_NS}}/scene/{name}",
-                spawn=None,
-                init_state=RigidObjectCfg.InitialStateCfg(pos=pos, rot=rot),
-            )
-            setattr(self, name, asset)
+    def _register_rigid_body(self, stage: Usd.Stage, alias: str, relative_prim_path: str):
+        prim = stage.GetPrimAtPath(f"/World/{relative_prim_path}")
+        if not prim:
+            raise ValueError(f"MILA scene is missing prim '/World/{relative_prim_path}' for alias '{alias}'")
+        if not UsdPhysics.RigidBodyAPI(prim):
+            raise ValueError(f"MILA prim '/World/{relative_prim_path}' for alias '{alias}' is not a rigid body")
+
+        print(f"Found rigid body: {alias} -> {relative_prim_path}")
+        pos = prim.GetAttribute("xformOp:translate").Get()
+        rot = prim.GetAttribute("xformOp:orient").Get()
+        rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
+        asset = RigidObjectCfg(
+            prim_path=f"{{ENV_REGEX_NS}}/scene/{relative_prim_path}",
+            spawn=None,
+            init_state=RigidObjectCfg.InitialStateCfg(pos=pos, rot=rot),
+        )
+        setattr(self, alias, asset)
 
 
 @configclass

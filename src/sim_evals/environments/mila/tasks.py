@@ -20,6 +20,13 @@ class MilaTask:
     milestones: tuple[Milestone, ...]
     object_name: str
     target_name: str
+    object_prim_path: str
+    target_prim_path: str
+    object_bbox_half_extents: tuple[float, float, float] | None = None
+    target_region_prim_path: str | None = None
+    target_region_extent_min: tuple[float, float, float] | None = None
+    target_region_extent_max: tuple[float, float, float] | None = None
+    target_region_tolerance: float = 0.01
     reach_distance: float = 0.07
     lift_height: float = 0.05
     target_xy_radius: float = 0.18
@@ -32,7 +39,7 @@ MILA_TASKS: dict[str, MilaTask] = {
     "place_spoon_in_sink": MilaTask(
         institution="MILA",
         task_id="place_spoon_in_sink",
-        scene_asset="place_spoon_in_sink.usd",
+        scene_asset="Task2/Scene.usd",
         language_instruction="Pick up the spoon and place it in the sink.",
         success_criteria="The spoon ends up lying flat in the sink and the gripper releases it.",
         max_timesteps=300,
@@ -59,6 +66,8 @@ MILA_TASKS: dict[str, MilaTask] = {
         ),
         object_name="spoon",
         target_name="sink",
+        object_prim_path="Spoon054/Spoon054",
+        target_prim_path="Sink081/Sink081",
     ),
     "place_spoon_in_utensil_holder": MilaTask(
         institution="MILA",
@@ -93,6 +102,8 @@ MILA_TASKS: dict[str, MilaTask] = {
         ),
         object_name="spoon",
         target_name="utensil_holder",
+        object_prim_path="Spoon054/Spoon054",
+        target_prim_path="Cup082/Cup082",
         target_xy_radius=0.16,
         above_target_height=0.10,
         in_target_height=0.12,
@@ -100,7 +111,7 @@ MILA_TASKS: dict[str, MilaTask] = {
     "stack_red_bowl_into_grey_bowl": MilaTask(
         institution="MILA",
         task_id="stack_red_bowl_into_grey_bowl",
-        scene_asset="stack_red_bowl_into_grey_bowl.usd",
+        scene_asset="Task1/Scene.usd",
         language_instruction="Pick up the red bowl and place it in the grey bowl.",
         success_criteria="The red bowl ends up inside the grey bowl.",
         max_timesteps=600,
@@ -124,6 +135,13 @@ MILA_TASKS: dict[str, MilaTask] = {
         ),
         object_name="red_bowl",
         target_name="grey_bowl",
+        object_prim_path="Bowl061/Bowl061",
+        target_prim_path="Bowl062/Bowl062",
+        object_bbox_half_extents=(0.079, 0.079, 0.030),
+        target_region_prim_path="Bowl062/Bowl062/Sites/bowl_liquid",
+        target_region_extent_min=(-0.089, -0.089, -0.034),
+        target_region_extent_max=(0.089, 0.089, 0.034),
+        target_region_tolerance=0.01,
         reach_distance=0.08,
         lift_height=0.05,
         target_xy_radius=0.18,
