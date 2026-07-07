@@ -5,7 +5,7 @@ from .droid_environment import MilaDroidEnvCfg
 
 
 gym.register(
-    id="MILA-DROID",
+    id="DROID-MILA",
     entry_point=ManagerBasedRLEnv,
     kwargs={
         "env_cfg_entry_point": MilaDroidEnvCfg,

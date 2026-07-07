@@ -55,8 +55,7 @@ MILA_TASKS: dict[str, MilaTask] = {
             Milestone(
                 name="above_sink",
                 description=(
-                    "The majority of the spoon (in the gripper or dropped) is above the sink, "
-                    "but not placed fully in the sink (either it's standing up or not released yet)."
+                    "The majority of the spoon was moved above the sink region before final placement."
                 ),
             ),
             Milestone(
@@ -88,8 +87,7 @@ MILA_TASKS: dict[str, MilaTask] = {
             Milestone(
                 name="above_utensil_holder",
                 description=(
-                    "Spoon's bottom end is lifted vertically above the utensil holder, somewhere closeby, "
-                    "or placed in the container but knocked it over."
+                    "Spoon's bottom end was moved above or into the utensil holder region before release."
                 ),
             ),
             Milestone(
@@ -126,7 +124,7 @@ MILA_TASKS: dict[str, MilaTask] = {
             ),
             Milestone(
                 name="above_grey_bowl",
-                description="Red bowl is lifted above the grey bowl vertically in height (anywhere).",
+                description="Red bowl was lifted vertically above the grey bowl height before final placement.",
             ),
             Milestone(
                 name="placed_in_grey_bowl",

@@ -63,11 +63,14 @@ def main(
     )
     instruction = None
     task_metadata = None
-    if env_id == "MILA-DROID":
-        from sim_evals.environments.mila.tasks import get_mila_task
+    if env_id == "DROID-MILA":
+        from sim_evals.environments.mila.tasks import MILA_TASKS, get_mila_task
 
         if task_id is None:
-            task_id = "place_spoon_in_sink"
+            supported_tasks = ", ".join(sorted(MILA_TASKS))
+            raise ValueError(
+                f"DROID-MILA requires --task-id. Supported tasks: {supported_tasks}"
+            )
         task = get_mila_task(task_id)
         instruction = task.language_instruction
         task_metadata = {
@@ -137,9 +140,9 @@ def main(
                         {
                             **task_metadata,
                             "episode": ep,
-                            "milestone_reward": episode_reward,
-                            "success": None,
-                            "highest_milestone_reached": None,
+                            "auto_milestone_reward": episode_reward,
+                            "highest_milestone": None,
+                            "task_complete": None,
                         },
                         f,
                         indent=2,
