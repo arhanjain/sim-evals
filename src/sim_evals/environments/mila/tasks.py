@@ -22,8 +22,6 @@ class MilaTask:
     target_name: str
     object_prim_path: str
     target_prim_path: str
-    object_bbox_half_extents: tuple[float, float, float] | None = None
-    reach_uses_object_center: bool = False
     object_bottom_center: tuple[float, float, float] | None = None
     object_mouth_center: tuple[float, float, float] | None = None
     target_region_prim_path: str | None = None
@@ -70,7 +68,7 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="sink",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Sink081/Sink081",
-        object_bbox_half_extents=(0.039, 0.181, 0.034),
+        reach_distance=0.20,
     ),
     "place_spoon_in_utensil_holder": MilaTask(
         institution="MILA",
@@ -106,7 +104,7 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="utensil_holder",
         object_prim_path="Spoon054/Spoon054",
         target_prim_path="Bowl060/Bowl060",
-        object_bbox_half_extents=(0.039, 0.181, 0.034),
+        reach_distance=0.20,
         target_xy_radius=0.16,
         above_target_height=0.10,
         in_target_height=0.12,
@@ -140,8 +138,6 @@ MILA_TASKS: dict[str, MilaTask] = {
         target_name="grey_bowl",
         object_prim_path="Bowl061/Bowl061",
         target_prim_path="Bowl062/Bowl062",
-        object_bbox_half_extents=(0.079, 0.079, 0.030),
-        reach_uses_object_center=True,
         reach_distance=0.12,
         object_bottom_center=(0.0, 0.0, -0.030),
         object_mouth_center=(0.0, 0.0, 0.030),

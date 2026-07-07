@@ -57,7 +57,7 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     target_pos = _target_pos(env)
     gripper_open = _gripper_open(env, task.release_gripper_threshold)
 
-    object_to_gripper = _gripper_object_distance(env, task)
+    object_to_gripper = torch.linalg.norm(object_pos - _gripper_pos(env), dim=1)
     object_to_target_xy = torch.linalg.norm(object_pos[:, :2] - target_pos[:, :2], dim=1)
     lifted = object_pos[:, 2] > env._mila_initial_object_z + task.lift_height
     above_target = (
@@ -72,7 +72,7 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     )
 
     reached_object = object_to_gripper < task.reach_distance
-    object_inside_target_region = _object_bbox_inside_target_region(env, task)
+    object_inside_target_region = _object_keypoints_inside_target_region(env, task)
 
     return {
         "reached_spoon": reached_object,
@@ -88,45 +88,7 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     }
 
 
-def _gripper_object_distance(env: ManagerBasedRLEnv, task) -> torch.Tensor:
-    if task.reach_uses_object_center or task.object_bbox_half_extents is None:
-        return torch.linalg.norm(_object_pos(env) - _gripper_pos(env), dim=1)
-
-    fingertip_pos = _gripper_fingertip_pos(env)
-    if fingertip_pos is None:
-        return torch.linalg.norm(_object_pos(env) - _gripper_pos(env), dim=1)
-
-    object_pos = _object_pos(env)
-    object_quat = _object_quat(env)
-    fingertip_points_object = _quat_rotate(
-        _quat_conjugate(object_quat)[:, None, :],
-        fingertip_pos - object_pos[:, None, :],
-    )
-    half_extents = torch.tensor(
-        task.object_bbox_half_extents,
-        device=env.device,
-        dtype=object_pos.dtype,
-    )
-    outside_distance = torch.clamp(torch.abs(fingertip_points_object) - half_extents, min=0.0)
-    fingertip_to_bbox = torch.linalg.norm(outside_distance, dim=-1)
-    return fingertip_to_bbox.min(dim=1).values
-
-
-def _gripper_fingertip_pos(env: ManagerBasedRLEnv) -> torch.Tensor | None:
-    robot = env.scene["robot"]
-    candidate_names = (
-        "left_inner_finger",
-        "right_inner_finger",
-        "left_outer_finger",
-        "right_outer_finger",
-    )
-    body_ids = [robot.data.body_names.index(name) for name in candidate_names if name in robot.data.body_names]
-    if not body_ids:
-        return None
-    return robot.data.body_pos_w[:, body_ids, :]
-
-
-def _object_bbox_inside_target_region(env: ManagerBasedRLEnv, task) -> torch.Tensor:
+def _object_keypoints_inside_target_region(env: ManagerBasedRLEnv, task) -> torch.Tensor:
     if task.target_region_extent_min is None or task.target_region_extent_max is None:
         return torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
 
@@ -156,11 +118,9 @@ def _object_containment_points(
     device: torch.device,
     dtype: torch.dtype,
 ) -> torch.Tensor | None:
-    if task.object_bottom_center is not None and task.object_mouth_center is not None:
-        return torch.tensor((task.object_bottom_center, task.object_mouth_center), device=device, dtype=dtype)
-    if task.object_bbox_half_extents is not None:
-        return _bbox_corner_points(task.object_bbox_half_extents, device=device, dtype=dtype)
-    return None
+    if task.object_bottom_center is None or task.object_mouth_center is None:
+        return None
+    return torch.tensor((task.object_bottom_center, task.object_mouth_center), device=device, dtype=dtype)
 
 
 def _object_mouth_above_bottom(env: ManagerBasedRLEnv, task, object_points_w: torch.Tensor) -> torch.Tensor:
@@ -169,28 +129,6 @@ def _object_mouth_above_bottom(env: ManagerBasedRLEnv, task, object_points_w: to
     bottom_center_z = object_points_w[:, 0, 2]
     mouth_center_z = object_points_w[:, 1, 2]
     return mouth_center_z > bottom_center_z
-
-
-def _bbox_corner_points(
-    half_extents: tuple[float, float, float],
-    device: torch.device,
-    dtype: torch.dtype,
-) -> torch.Tensor:
-    hx, hy, hz = half_extents
-    return torch.tensor(
-        [
-            (-hx, -hy, -hz),
-            (-hx, -hy, hz),
-            (-hx, hy, -hz),
-            (-hx, hy, hz),
-            (hx, -hy, -hz),
-            (hx, -hy, hz),
-            (hx, hy, -hz),
-            (hx, hy, hz),
-        ],
-        device=device,
-        dtype=dtype,
-    )
 
 
 def _object_quat(env: ManagerBasedRLEnv) -> torch.Tensor:
