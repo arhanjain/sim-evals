@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-import math
 from pathlib import Path
 
 
@@ -10,34 +9,13 @@ CONFIG_DIR = Path(__file__).resolve().parents[4] / "configs" / "mila"
 SCENE_ASSET = "Task1/Scene.usd"
 BASE_SEED = 42
 SUCCESS_HOLD_STEPS = 5
+INITIAL_CONDITION_COUNT = 20
 
 
 @dataclass(frozen=True)
 class Milestone:
     name: str
     description: str
-
-
-@dataclass(frozen=True)
-class SpawnBounds:
-    """Robot-frame reset offsets around an S3-matched nominal pose."""
-
-    x: tuple[float, float] = (0.0, 0.0)
-    y: tuple[float, float] = (0.0, 0.0)
-    yaw: tuple[float, float] = (0.0, 0.0)
-
-
-@dataclass(frozen=True)
-class SpawnConstraint:
-    kind: str
-    asset_a: str
-    asset_b: str
-    minimum_distance: float | None = None
-    asset_a_points: tuple[tuple[float, float, float], ...] = ()
-    asset_b_radius: float | None = None
-    asset_b_extent_min: tuple[float, float, float] | None = None
-    asset_b_extent_max: tuple[float, float, float] | None = None
-    clearance: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -90,9 +68,6 @@ class MilaTask:
     object_init_rot_world: tuple[float, float, float, float]
     target_init_pos_world: tuple[float, float, float] | None
     target_init_rot_world: tuple[float, float, float, float] | None
-    object_spawn_bounds: SpawnBounds | None
-    target_spawn_bounds: SpawnBounds | None
-    spawn_constraints: tuple[SpawnConstraint, ...]
     cameras: dict[str, CameraCfg]
     dome_light: DomeLightCfg
     sphere_light: SphereLightCfg
@@ -133,10 +108,17 @@ def _initial_conditions(task_id: str, actor_names: tuple[str, ...]):
     poses = data.get("poses")
     if not isinstance(instruction, str) or not instruction:
         raise ValueError(f"{path} must define a non-empty instruction")
-    if not isinstance(poses, list) or len(poses) != 1 or not isinstance(poses[0], dict):
-        raise ValueError(f"{path} must define exactly one nominal pose mapping")
-    if set(poses[0]) != set(actor_names):
-        raise ValueError(f"{path} must define poses for {sorted(actor_names)}")
+    if not isinstance(poses, list) or len(poses) != INITIAL_CONDITION_COUNT:
+        raise ValueError(
+            f"{path} must define exactly {INITIAL_CONDITION_COUNT} pose mappings"
+        )
+    for index, pose in enumerate(poses):
+        if not isinstance(pose, dict) or set(pose) != set(actor_names):
+            raise ValueError(
+                f"{path}: poses[{index}] must define poses for {sorted(actor_names)}"
+            )
+        for name in actor_names:
+            _pose(pose[name], f"{path}: poses[{index}].{name}")
     actor_poses = {
         name: _pose(poses[0][name], f"{path}: poses[0].{name}")
         for name in actor_names
@@ -223,27 +205,6 @@ MILA_TASKS = {
         object_init_rot_world=sink_poses["spoon"][1],
         target_init_pos_world=None,
         target_init_rot_world=None,
-        object_spawn_bounds=SpawnBounds(y=(-0.07, 0.07), yaw=(-math.pi, math.pi)),
-        target_spawn_bounds=None,
-        spawn_constraints=(
-            SpawnConstraint(
-                kind="segment_aabb_clearance",
-                asset_a="spoon",
-                asset_b="sink",
-                asset_a_points=((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
-                asset_b_extent_min=(
-                    -0.17917540669441223,
-                    -0.15094169974327087,
-                    -0.10113153606653214,
-                ),
-                asset_b_extent_max=(
-                    0.17917540669441223,
-                    0.15094169974327087,
-                    0.10113153606653214,
-                ),
-                clearance=0.015,
-            ),
-        ),
         cameras={"external_cam": EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
         dome_light=SHARED_DOME_LIGHT,
         sphere_light=SPHERE_LIGHT_OFF,
@@ -295,18 +256,6 @@ MILA_TASKS = {
         object_init_rot_world=holder_poses["spoon"][1],
         target_init_pos_world=holder_poses["utensil_holder"][0],
         target_init_rot_world=holder_poses["utensil_holder"][1],
-        object_spawn_bounds=SpawnBounds(y=(-0.15, 0.0), yaw=(-math.pi, math.pi)),
-        target_spawn_bounds=None,
-        spawn_constraints=(
-            SpawnConstraint(
-                kind="segment_circle_clearance",
-                asset_a="spoon",
-                asset_b="utensil_holder",
-                asset_a_points=((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
-                asset_b_radius=0.07,
-                clearance=0.01,
-            ),
-        ),
         cameras={"external_cam": HOLDER_EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
         dome_light=SHARED_DOME_LIGHT,
         sphere_light=SphereLightCfg(
@@ -364,16 +313,6 @@ MILA_TASKS = {
         object_init_rot_world=bowl_poses["red_bowl"][1],
         target_init_pos_world=bowl_poses["grey_bowl"][0],
         target_init_rot_world=bowl_poses["grey_bowl"][1],
-        object_spawn_bounds=SpawnBounds(y=(0.0, 0.15)),
-        target_spawn_bounds=SpawnBounds(x=(-0.10, 0.10), y=(0.0, 0.166)),
-        spawn_constraints=(
-            SpawnConstraint(
-                kind="minimum_planar_distance",
-                asset_a="red_bowl",
-                asset_b="grey_bowl",
-                minimum_distance=0.191,
-            ),
-        ),
         cameras={"external_cam": EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
         dome_light=SHARED_DOME_LIGHT,
         sphere_light=SPHERE_LIGHT_OFF,

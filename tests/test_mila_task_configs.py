@@ -11,13 +11,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TASKS_PATH = ROOT / "src" / "sim_evals" / "environments" / "mila" / "tasks.py"
+GENERATOR_PATH = ROOT / "scripts" / "generate_mila_initial_conditions.py"
 
 
-def _load_tasks_module():
-    module_name = "mila_tasks_config_test"
-    spec = importlib.util.spec_from_file_location(module_name, TASKS_PATH)
+def _load_module(module_name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"Could not load {TASKS_PATH}")
+        raise RuntimeError(f"Could not load {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
@@ -27,7 +27,8 @@ def _load_tasks_module():
 class MilaTaskConfigTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.module = _load_tasks_module()
+        cls.module = _load_module("mila_tasks_config_test", TASKS_PATH)
+        cls.generator = _load_module("mila_initial_conditions_test", GENERATOR_PATH)
         cls.tasks = cls.module.MILA_TASKS
 
     def test_all_tasks_use_replacement_scene_and_seed_42(self):
@@ -45,36 +46,55 @@ class MilaTaskConfigTest(unittest.TestCase):
             self.assertEqual(task.success_hold_steps, 5)
             self.assertEqual(task.final_milestone, task.milestones[-1].name)
 
-    def test_randomization_is_object_only_with_approved_ranges(self):
+    def test_generation_recipe_preserves_approved_object_only_ranges(self):
+        sink = self.generator.TASK_SPECS["place_spoon_in_sink"]
+        spoon = sink.actors["spoon"]
+        self.assertEqual(spoon.bounds.x, (0.0, 0.0))
+        self.assertEqual(spoon.bounds.y, (-0.07, 0.07))
+        self.assertEqual(spoon.bounds.yaw, (-math.pi, math.pi))
+        self.assertEqual(sink.constraints[0].kind, "segment_aabb_clearance")
+        self.assertEqual(sink.constraints[0].asset_b, "sink")
+        self.assertAlmostEqual(sink.constraints[0].clearance, 0.015)
+
+        holder = self.generator.TASK_SPECS["place_spoon_in_utensil_holder"]
+        spoon = holder.actors["spoon"]
+        self.assertEqual(spoon.bounds.x, (0.0, 0.0))
+        self.assertEqual(spoon.bounds.y, (-0.15, 0.0))
+        self.assertEqual(spoon.bounds.yaw, (-math.pi, math.pi))
+        self.assertIsNone(holder.actors["utensil_holder"].bounds)
+        self.assertEqual(holder.constraints[0].kind, "segment_circle_clearance")
+
+        bowls = self.generator.TASK_SPECS["stack_red_bowl_into_grey_bowl"]
+        red = bowls.actors["red_bowl"]
+        grey = bowls.actors["grey_bowl"]
+        self.assertEqual(red.bounds.x, (0.0, 0.0))
+        self.assertEqual(red.bounds.y, (0.0, 0.15))
+        self.assertEqual(red.bounds.yaw, (0.0, 0.0))
+        self.assertEqual(grey.bounds.x, (-0.10, 0.10))
+        self.assertEqual(grey.bounds.y, (0.0, 0.166))
+        self.assertEqual(grey.bounds.yaw, (0.0, 0.0))
+        self.assertEqual(bowls.constraints[0].kind, "minimum_planar_distance")
+
+    def test_environment_enumerates_json_without_runtime_randomization(self):
+        environment_path = (
+            ROOT
+            / "src"
+            / "sim_evals"
+            / "environments"
+            / "mila"
+            / "mila_droid_environment.py"
+        )
+        source = environment_path.read_text(encoding="utf-8")
+        self.assertNotIn("randomize_mila_task_assets", source)
+        self.assertIn("func=reset_initial_conditions", source)
+
+    def test_success_geometry_remains_task_specific(self):
         sink = self.tasks["place_spoon_in_sink"]
-        self.assertEqual(sink.object_spawn_bounds.x, (0.0, 0.0))
-        self.assertEqual(sink.object_spawn_bounds.y, (-0.07, 0.07))
-        self.assertEqual(sink.object_spawn_bounds.yaw, (-math.pi, math.pi))
-        self.assertIsNone(sink.target_spawn_bounds)
-        self.assertEqual(sink.spawn_constraints[0].kind, "segment_aabb_clearance")
-        self.assertEqual(sink.spawn_constraints[0].asset_b, "sink")
-        self.assertAlmostEqual(sink.spawn_constraints[0].clearance, 0.015)
         self.assertEqual(
             sink.object_region_points,
             ((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
         )
         self.assertEqual(sink.target_region_prim_path, "Sink003/Sink003/Sites/reg_basin")
-
-        holder = self.tasks["place_spoon_in_utensil_holder"]
-        self.assertEqual(holder.object_spawn_bounds.x, (0.0, 0.0))
-        self.assertEqual(holder.object_spawn_bounds.y, (-0.15, 0.0))
-        self.assertEqual(holder.object_spawn_bounds.yaw, (-math.pi, math.pi))
-        self.assertIsNone(holder.target_spawn_bounds)
-        self.assertEqual(holder.spawn_constraints[0].kind, "segment_circle_clearance")
-
-        bowls = self.tasks["stack_red_bowl_into_grey_bowl"]
-        self.assertEqual(bowls.object_spawn_bounds.x, (0.0, 0.0))
-        self.assertEqual(bowls.object_spawn_bounds.y, (0.0, 0.15))
-        self.assertEqual(bowls.object_spawn_bounds.yaw, (0.0, 0.0))
-        self.assertEqual(bowls.target_spawn_bounds.x, (-0.10, 0.10))
-        self.assertEqual(bowls.target_spawn_bounds.y, (0.0, 0.166))
-        self.assertEqual(bowls.target_spawn_bounds.yaw, (0.0, 0.0))
-        self.assertEqual(bowls.spawn_constraints[0].kind, "minimum_planar_distance")
 
     def test_initial_conditions_use_existing_json_contract(self):
         for task in self.tasks.values():
@@ -83,7 +103,15 @@ class MilaTaskConfigTest(unittest.TestCase):
             raw = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(set(raw), {"instruction", "poses"})
             self.assertEqual(raw["instruction"], task.language_instruction)
-            self.assertEqual(len(raw["poses"]), 1)
+            self.assertEqual(len(raw["poses"]), 20)
+            self.assertEqual(
+                raw,
+                self.generator.generate_document(task.task_id),
+            )
+            self.assertEqual(
+                len({json.dumps(pose, sort_keys=True) for pose in raw["poses"]}),
+                20,
+            )
             self.assertEqual(
                 set(raw["poses"][0]),
                 {task.object_name}

@@ -6,8 +6,6 @@ from pathlib import Path
 
 import isaaclab.sim as sim_utils
 import isaaclab.envs.mdp as mdp
-import isaaclab.utils.math as math_utils
-import torch
 from isaaclab.assets import AssetBaseCfg, RigidObjectCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
@@ -20,9 +18,10 @@ from sim_evals.environments.droid_environment import (
     EventCfg as DroidEventCfg,
     SceneCfg as DroidSceneCfg,
 )
+from sim_evals.environments.lw_environment import reset_initial_conditions
 
 from .rewards import milestone_reward, reset_milestones
-from .tasks import CameraCfg, MilaTask, SpawnBounds, SpawnConstraint, get_mila_task
+from .tasks import CameraCfg, MilaTask, get_mila_task
 
 
 MILA_ASSET_PATH = DATA_PATH / "mila"
@@ -124,249 +123,6 @@ def configure_mila_task_scene(env, env_ids, task_id: str):
             prim = stage.GetPrimAtPath(f"{scene_root}/{relative_path}")
             if prim:
                 prim.SetActive(False)
-
-
-def _sample_rigid_asset_pose(env, env_ids, asset_name: str, robot_base_rot, bounds: SpawnBounds):
-    asset = env.scene[asset_name]
-    root_states = asset.data.default_root_state[env_ids].clone()
-    sample_ranges = torch.tensor(
-        (bounds.x, bounds.y, bounds.yaw),
-        dtype=root_states.dtype,
-        device=asset.device,
-    )
-    samples = math_utils.sample_uniform(
-        sample_ranges[:, 0],
-        sample_ranges[:, 1],
-        (len(env_ids), 3),
-        device=asset.device,
-    )
-
-    local_offsets = torch.zeros((len(env_ids), 3), dtype=root_states.dtype, device=asset.device)
-    local_offsets[:, :2] = samples[:, :2]
-    base_rot = torch.tensor(robot_base_rot, dtype=root_states.dtype, device=asset.device).repeat(len(env_ids), 1)
-    world_offsets = math_utils.quat_apply(base_rot, local_offsets)
-
-    positions = root_states[:, :3] + env.scene.env_origins[env_ids] + world_offsets
-    zeros = torch.zeros(len(env_ids), dtype=root_states.dtype, device=asset.device)
-    yaw_delta = math_utils.quat_from_euler_xyz(zeros, zeros, samples[:, 2])
-    orientations = math_utils.quat_mul(yaw_delta, root_states[:, 3:7])
-
-    return positions, orientations, root_states
-
-
-def _default_rigid_asset_pose(env, env_ids, asset_name: str):
-    asset = env.scene[asset_name]
-    root_states = asset.data.default_root_state[env_ids].clone()
-    return (
-        root_states[:, :3] + env.scene.env_origins[env_ids],
-        root_states[:, 3:7],
-        root_states,
-    )
-
-
-def _fixed_target_pose(env, env_ids, task: MilaTask):
-    if task.fixed_target_pos_robot is None:
-        raise ValueError(f"Task '{task.task_id}' does not define a fixed target pose")
-    position = _transform_pos(
-        task.robot_base_pos,
-        task.robot_base_rot,
-        task.fixed_target_pos_robot,
-    )
-    orientation = _quat_multiply(
-        task.robot_base_rot,
-        task.fixed_target_rot_robot,
-    )
-    positions = torch.tensor(
-        position,
-        dtype=torch.float32,
-        device=env.device,
-    ).repeat(len(env_ids), 1)
-    positions += env.scene.env_origins[env_ids]
-    orientations = torch.tensor(
-        orientation,
-        dtype=torch.float32,
-        device=env.device,
-    ).repeat(len(env_ids), 1)
-    return positions, orientations, None
-
-
-def _segment_circle_clearance_valid(
-    segment_pos: torch.Tensor,
-    segment_quat: torch.Tensor,
-    circle_pos: torch.Tensor,
-    constraint: SpawnConstraint,
-) -> torch.Tensor:
-    points_local = torch.tensor(
-        constraint.asset_a_points,
-        dtype=segment_pos.dtype,
-        device=segment_pos.device,
-    )
-    count = segment_pos.shape[0]
-    points_w = segment_pos[:, None, :] + math_utils.quat_apply(
-        segment_quat[:, None, :].expand(-1, len(points_local), -1).reshape(-1, 4),
-        points_local[None, :, :].expand(count, -1, -1).reshape(-1, 3),
-    ).reshape(count, len(points_local), 3)
-    start = points_w[:, 0, :2]
-    end = points_w[:, 1, :2]
-    segment = end - start
-    segment_length_squared = (segment * segment).sum(dim=-1).clamp_min(1e-12)
-    projection = (((circle_pos[:, :2] - start) * segment).sum(dim=-1) / segment_length_squared).clamp(0.0, 1.0)
-    closest = start + projection[:, None] * segment
-    distance = torch.linalg.norm(circle_pos[:, :2] - closest, dim=-1)
-    required = float(constraint.asset_b_radius or 0.0) + constraint.clearance
-    return distance >= required
-
-
-def _segment_aabb_clearance_valid(
-    segment_pos: torch.Tensor,
-    segment_quat: torch.Tensor,
-    box_pos: torch.Tensor,
-    box_quat: torch.Tensor,
-    constraint: SpawnConstraint,
-) -> torch.Tensor:
-    if constraint.asset_b_extent_min is None or constraint.asset_b_extent_max is None:
-        raise ValueError("segment_aabb_clearance requires target extents")
-    points_local = torch.tensor(
-        constraint.asset_a_points,
-        dtype=segment_pos.dtype,
-        device=segment_pos.device,
-    )
-    count = segment_pos.shape[0]
-    points_w = segment_pos[:, None, :] + math_utils.quat_apply(
-        segment_quat[:, None, :].expand(-1, len(points_local), -1).reshape(-1, 4),
-        points_local[None, :, :].expand(count, -1, -1).reshape(-1, 3),
-    ).reshape(count, len(points_local), 3)
-    points_b = math_utils.quat_apply_inverse(
-        box_quat[:, None, :].expand(-1, len(points_local), -1).reshape(-1, 4),
-        (points_w - box_pos[:, None, :]).reshape(-1, 3),
-    ).reshape(count, len(points_local), 3)
-
-    box_min = torch.tensor(
-        constraint.asset_b_extent_min[:2],
-        dtype=segment_pos.dtype,
-        device=segment_pos.device,
-    ) - constraint.clearance
-    box_max = torch.tensor(
-        constraint.asset_b_extent_max[:2],
-        dtype=segment_pos.dtype,
-        device=segment_pos.device,
-    ) + constraint.clearance
-    start = points_b[:, 0, :2]
-    direction = points_b[:, 1, :2] - start
-    parallel = direction.abs() < 1e-9
-    parallel_outside = parallel & ((start < box_min) | (start > box_max))
-    safe_direction = torch.where(parallel, torch.ones_like(direction), direction)
-    first_crossing = (box_min - start) / safe_direction
-    second_crossing = (box_max - start) / safe_direction
-    crossing_min = torch.minimum(first_crossing, second_crossing)
-    crossing_max = torch.maximum(first_crossing, second_crossing)
-    crossing_min = torch.where(parallel, torch.zeros_like(crossing_min), crossing_min)
-    crossing_max = torch.where(parallel, torch.ones_like(crossing_max), crossing_max)
-    entry = crossing_min.max(dim=-1).values.clamp_min(0.0)
-    exit = crossing_max.min(dim=-1).values.clamp_max(1.0)
-    intersects = ~parallel_outside.any(dim=-1) & (entry <= exit)
-    return ~intersects
-
-
-def _spawn_constraints_valid(candidate_poses, constraints) -> torch.Tensor:
-    first_position = next(iter(candidate_poses.values()))[0]
-    valid = torch.ones(first_position.shape[0], dtype=torch.bool, device=first_position.device)
-    for constraint in constraints:
-        pos_a, quat_a, _state_a = candidate_poses[constraint.asset_a]
-        pos_b, quat_b, _state_b = candidate_poses[constraint.asset_b]
-        if constraint.kind == "minimum_planar_distance":
-            valid &= torch.linalg.norm(pos_a[:, :2] - pos_b[:, :2], dim=-1) >= float(
-                constraint.minimum_distance or 0.0
-            )
-        elif constraint.kind == "segment_circle_clearance":
-            valid &= _segment_circle_clearance_valid(pos_a, quat_a, pos_b, constraint)
-        elif constraint.kind == "segment_aabb_clearance":
-            valid &= _segment_aabb_clearance_valid(
-                pos_a,
-                quat_a,
-                pos_b,
-                quat_b,
-                constraint,
-            )
-        else:
-            raise ValueError(f"Unsupported spawn constraint: {constraint.kind}")
-    return valid
-
-
-def randomize_mila_task_assets(env, env_ids: torch.Tensor, task_id: str):
-    task = get_mila_task(task_id)
-    randomized_bounds = {
-        name: bounds
-        for name, bounds in (
-            (task.object_name, task.object_spawn_bounds),
-            (task.target_name, task.target_spawn_bounds),
-        )
-        if bounds is not None
-    }
-    if not randomized_bounds:
-        return
-
-    involved_assets = set(randomized_bounds)
-    for constraint in task.spawn_constraints:
-        involved_assets.add(constraint.asset_a)
-        if not (
-            constraint.asset_b == task.target_name
-            and task.fixed_target_pos_robot is not None
-        ):
-            involved_assets.add(constraint.asset_b)
-    involved_asset_names = sorted(involved_assets)
-
-    accepted = torch.zeros(len(env_ids), dtype=torch.bool, device=env.device)
-    accepted_poses = {}
-    for _attempt in range(128):
-        candidate_poses = {
-            asset_name: (
-                _sample_rigid_asset_pose(
-                    env,
-                    env_ids,
-                    asset_name,
-                    task.robot_base_rot,
-                    randomized_bounds[asset_name],
-                )
-                if asset_name in randomized_bounds
-                else _default_rigid_asset_pose(env, env_ids, asset_name)
-            )
-            for asset_name in involved_asset_names
-        }
-        if task.fixed_target_pos_robot is not None:
-            candidate_poses[task.target_name] = _fixed_target_pose(env, env_ids, task)
-        valid = _spawn_constraints_valid(candidate_poses, task.spawn_constraints)
-        newly_accepted = valid & ~accepted
-        for asset_name in randomized_bounds:
-            positions, orientations, root_states = candidate_poses[asset_name]
-            if asset_name not in accepted_poses:
-                accepted_poses[asset_name] = (
-                    positions.clone(),
-                    orientations.clone(),
-                    root_states.clone(),
-                )
-            else:
-                accepted_poses[asset_name][0][newly_accepted] = positions[newly_accepted]
-                accepted_poses[asset_name][1][newly_accepted] = orientations[newly_accepted]
-                accepted_poses[asset_name][2][newly_accepted] = root_states[newly_accepted]
-            if _attempt == 0:
-                accepted_poses[asset_name][0][~newly_accepted] = positions[~newly_accepted]
-                accepted_poses[asset_name][1][~newly_accepted] = orientations[~newly_accepted]
-                accepted_poses[asset_name][2][~newly_accepted] = root_states[~newly_accepted]
-        accepted |= valid
-        if bool(accepted.all()):
-            break
-    if not bool(accepted.all()):
-        raise RuntimeError(f"Could not sample valid {task_id} object spawns after 128 attempts")
-
-    for asset_name, (positions, orientations, root_states) in accepted_poses.items():
-        asset = env.scene[asset_name]
-        asset.write_root_pose_to_sim(
-            torch.cat((positions, orientations), dim=-1), env_ids=env_ids
-        )
-        asset.write_root_velocity_to_sim(
-            torch.zeros_like(root_states[:, 7:13]), env_ids=env_ids
-        )
 
 
 def _make_dome_light(task: MilaTask):
@@ -523,10 +279,14 @@ class MilaEventCfg(DroidEventCfg):
         params={"task_id": DEFAULT_TASK_ID},
     )
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
-    randomize_task_assets = EventTerm(
-        func=randomize_mila_task_assets,
+    reset_initial_conditions = EventTerm(
+        func=reset_initial_conditions,
         mode="reset",
-        params={"task_id": DEFAULT_TASK_ID},
+        params={
+            "initial_conditions_file": get_mila_task(
+                DEFAULT_TASK_ID
+            ).initial_conditions_file,
+        },
     )
     reset_milestones = EventTerm(func=reset_milestones, mode="reset")
 
@@ -559,6 +319,8 @@ class MilaDroidEnvCfg(DroidEnvCfg):
         self.scene.dynamic_task_scene(task.task_id)
         self.rewards.milestones.params["task_id"] = task.task_id
         self.events.configure_task_scene.params["task_id"] = task.task_id
-        self.events.randomize_task_assets.params["task_id"] = task.task_id
+        self.events.reset_initial_conditions.params[
+            "initial_conditions_file"
+        ] = task.initial_conditions_file
         self.seed = task.seed
         self.episode_length_s = task.max_timesteps * self.sim.dt * self.decimation
