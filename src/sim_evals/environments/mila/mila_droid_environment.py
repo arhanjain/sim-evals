@@ -164,6 +164,32 @@ def _default_rigid_asset_pose(env, env_ids, asset_name: str):
     )
 
 
+def _fixed_target_pose(env, env_ids, task: MilaTask):
+    if task.fixed_target_pos_robot is None:
+        raise ValueError(f"Task '{task.task_id}' does not define a fixed target pose")
+    position = _transform_pos(
+        task.robot_base_pos,
+        task.robot_base_rot,
+        task.fixed_target_pos_robot,
+    )
+    orientation = _quat_multiply(
+        task.robot_base_rot,
+        task.fixed_target_rot_robot,
+    )
+    positions = torch.tensor(
+        position,
+        dtype=torch.float32,
+        device=env.device,
+    ).repeat(len(env_ids), 1)
+    positions += env.scene.env_origins[env_ids]
+    orientations = torch.tensor(
+        orientation,
+        dtype=torch.float32,
+        device=env.device,
+    ).repeat(len(env_ids), 1)
+    return positions, orientations, None
+
+
 def _segment_circle_clearance_valid(
     segment_pos: torch.Tensor,
     segment_quat: torch.Tensor,
@@ -191,18 +217,77 @@ def _segment_circle_clearance_valid(
     return distance >= required
 
 
+def _segment_aabb_clearance_valid(
+    segment_pos: torch.Tensor,
+    segment_quat: torch.Tensor,
+    box_pos: torch.Tensor,
+    box_quat: torch.Tensor,
+    constraint: SpawnConstraint,
+) -> torch.Tensor:
+    if constraint.asset_b_extent_min is None or constraint.asset_b_extent_max is None:
+        raise ValueError("segment_aabb_clearance requires target extents")
+    points_local = torch.tensor(
+        constraint.asset_a_points,
+        dtype=segment_pos.dtype,
+        device=segment_pos.device,
+    )
+    count = segment_pos.shape[0]
+    points_w = segment_pos[:, None, :] + math_utils.quat_apply(
+        segment_quat[:, None, :].expand(-1, len(points_local), -1).reshape(-1, 4),
+        points_local[None, :, :].expand(count, -1, -1).reshape(-1, 3),
+    ).reshape(count, len(points_local), 3)
+    points_b = math_utils.quat_apply_inverse(
+        box_quat[:, None, :].expand(-1, len(points_local), -1).reshape(-1, 4),
+        (points_w - box_pos[:, None, :]).reshape(-1, 3),
+    ).reshape(count, len(points_local), 3)
+
+    box_min = torch.tensor(
+        constraint.asset_b_extent_min[:2],
+        dtype=segment_pos.dtype,
+        device=segment_pos.device,
+    ) - constraint.clearance
+    box_max = torch.tensor(
+        constraint.asset_b_extent_max[:2],
+        dtype=segment_pos.dtype,
+        device=segment_pos.device,
+    ) + constraint.clearance
+    start = points_b[:, 0, :2]
+    direction = points_b[:, 1, :2] - start
+    parallel = direction.abs() < 1e-9
+    parallel_outside = parallel & ((start < box_min) | (start > box_max))
+    safe_direction = torch.where(parallel, torch.ones_like(direction), direction)
+    first_crossing = (box_min - start) / safe_direction
+    second_crossing = (box_max - start) / safe_direction
+    crossing_min = torch.minimum(first_crossing, second_crossing)
+    crossing_max = torch.maximum(first_crossing, second_crossing)
+    crossing_min = torch.where(parallel, torch.zeros_like(crossing_min), crossing_min)
+    crossing_max = torch.where(parallel, torch.ones_like(crossing_max), crossing_max)
+    entry = crossing_min.max(dim=-1).values.clamp_min(0.0)
+    exit = crossing_max.min(dim=-1).values.clamp_max(1.0)
+    intersects = ~parallel_outside.any(dim=-1) & (entry <= exit)
+    return ~intersects
+
+
 def _spawn_constraints_valid(candidate_poses, constraints) -> torch.Tensor:
     first_position = next(iter(candidate_poses.values()))[0]
     valid = torch.ones(first_position.shape[0], dtype=torch.bool, device=first_position.device)
     for constraint in constraints:
         pos_a, quat_a, _state_a = candidate_poses[constraint.asset_a]
-        pos_b, _quat_b, _state_b = candidate_poses[constraint.asset_b]
+        pos_b, quat_b, _state_b = candidate_poses[constraint.asset_b]
         if constraint.kind == "minimum_planar_distance":
             valid &= torch.linalg.norm(pos_a[:, :2] - pos_b[:, :2], dim=-1) >= float(
                 constraint.minimum_distance or 0.0
             )
         elif constraint.kind == "segment_circle_clearance":
             valid &= _segment_circle_clearance_valid(pos_a, quat_a, pos_b, constraint)
+        elif constraint.kind == "segment_aabb_clearance":
+            valid &= _segment_aabb_clearance_valid(
+                pos_a,
+                quat_a,
+                pos_b,
+                quat_b,
+                constraint,
+            )
         else:
             raise ValueError(f"Unsupported spawn constraint: {constraint.kind}")
     return valid
@@ -223,7 +308,12 @@ def randomize_mila_task_assets(env, env_ids: torch.Tensor, task_id: str):
 
     involved_assets = set(randomized_bounds)
     for constraint in task.spawn_constraints:
-        involved_assets.update((constraint.asset_a, constraint.asset_b))
+        involved_assets.add(constraint.asset_a)
+        if not (
+            constraint.asset_b == task.target_name
+            and task.fixed_target_pos_robot is not None
+        ):
+            involved_assets.add(constraint.asset_b)
     involved_asset_names = sorted(involved_assets)
 
     accepted = torch.zeros(len(env_ids), dtype=torch.bool, device=env.device)
@@ -243,6 +333,8 @@ def randomize_mila_task_assets(env, env_ids: torch.Tensor, task_id: str):
             )
             for asset_name in involved_asset_names
         }
+        if task.fixed_target_pos_robot is not None:
+            candidate_poses[task.target_name] = _fixed_target_pose(env, env_ids, task)
         valid = _spawn_constraints_valid(candidate_poses, task.spawn_constraints)
         newly_accepted = valid & ~accepted
         for asset_name in randomized_bounds:

@@ -51,6 +51,9 @@ class MilaTaskConfigTest(unittest.TestCase):
         self.assertEqual(sink.object_spawn_bounds.y, (-0.07, 0.07))
         self.assertEqual(sink.object_spawn_bounds.yaw, (-math.pi, math.pi))
         self.assertIsNone(sink.target_spawn_bounds)
+        self.assertEqual(sink.spawn_constraints[0].kind, "segment_aabb_clearance")
+        self.assertEqual(sink.spawn_constraints[0].asset_b, "sink")
+        self.assertAlmostEqual(sink.spawn_constraints[0].clearance, 0.015)
         self.assertEqual(
             sink.object_region_points,
             ((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),

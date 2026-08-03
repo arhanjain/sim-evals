@@ -35,6 +35,8 @@ class SpawnConstraint:
     minimum_distance: float | None = None
     asset_a_points: tuple[tuple[float, float, float], ...] = ()
     asset_b_radius: float | None = None
+    asset_b_extent_min: tuple[float, float, float] | None = None
+    asset_b_extent_max: tuple[float, float, float] | None = None
     clearance: float = 0.0
 
 
@@ -223,7 +225,25 @@ MILA_TASKS = {
         target_init_rot_world=None,
         object_spawn_bounds=SpawnBounds(y=(-0.07, 0.07), yaw=(-math.pi, math.pi)),
         target_spawn_bounds=None,
-        spawn_constraints=(),
+        spawn_constraints=(
+            SpawnConstraint(
+                kind="segment_aabb_clearance",
+                asset_a="spoon",
+                asset_b="sink",
+                asset_a_points=((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
+                asset_b_extent_min=(
+                    -0.17917540669441223,
+                    -0.15094169974327087,
+                    -0.10113153606653214,
+                ),
+                asset_b_extent_max=(
+                    0.17917540669441223,
+                    0.15094169974327087,
+                    0.10113153606653214,
+                ),
+                clearance=0.015,
+            ),
+        ),
         cameras={"external_cam": EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
         dome_light=SHARED_DOME_LIGHT,
         sphere_light=SPHERE_LIGHT_OFF,
