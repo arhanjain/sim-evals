@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
   "pip>=25.0",
   "mediapy>=1.2.4",
+  "pyyaml>=6.0.2",
   "openpi-client",
   "isaaclab[all,isaacsim]==2.3.0",
   "tyro>=0.9.17",

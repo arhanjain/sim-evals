@@ -1,0 +1,14 @@
+import gymnasium as gym
+from isaaclab.envs import ManagerBasedRLEnv
+
+from .mila_droid_environment import MilaDroidEnvCfg
+
+
+gym.register(
+    id="DROID-MILA",
+    entry_point=ManagerBasedRLEnv,
+    kwargs={
+        "env_cfg_entry_point": MilaDroidEnvCfg,
+    },
+    disable_env_checker=True,
+)

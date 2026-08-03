@@ -19,7 +19,6 @@ gym.register(
     disable_env_checker=True,
 )
 
-
 # TODO: check that final points are awarded when object is not grasped
 gym.register(
     id="Test",
@@ -176,3 +175,5 @@ gym.register(
 #                 (checkers.lift("tape_00", threshold=0.04), [0]),
 #                 (checkers.is_within_xy("tape_00", "container_02", percent_threshold=0.8), [1]),
 #             ]
+
+from . import mila  # noqa: F401, E402
