@@ -86,15 +86,13 @@ def _spawn_mila_scene(
 
     stage = omni.usd.get_context().get_stage()
     actor_specs = (
-        (task.object_prim_path, task.object_init_pos_robot, task.object_init_rot_robot),
-        (task.target_prim_path, task.target_init_pos_robot, task.target_init_rot_robot),
+        (task.object_prim_path, task.object_init_pos_world, task.object_init_rot_world),
+        (task.target_prim_path, task.target_init_pos_world, task.target_init_rot_world),
     )
-    for actor_path, pos_robot, rot_robot in actor_specs:
-        if actor_path is None or pos_robot is None or rot_robot is None:
+    for actor_path, pos, rot in actor_specs:
+        if actor_path is None or pos is None or rot is None:
             continue
         wrapper_name = actor_path.split("/", 1)[0]
-        pos = _transform_pos(task.robot_base_pos, task.robot_base_rot, pos_robot)
-        rot = _quat_multiply(task.robot_base_rot, rot_robot)
         matches = [
             candidate
             for candidate in stage.Traverse()
@@ -322,7 +320,7 @@ def _configured_camera(camera, name: str, config: CameraCfg):
 @configclass
 class MilaSceneCfg(DroidSceneCfg):
     # Suppress DroidSceneCfg's always-on sphere light. MILA's optional sphere
-    # is instantiated below only when the active task YAML enables it.
+    # is instantiated below only when the active task configuration enables it.
     sphere_light: AssetBaseCfg | None = None
     policy_dome_light = _make_dome_light(get_mila_task(DEFAULT_TASK_ID))
     overhead_light: AssetBaseCfg | None = None
@@ -369,8 +367,8 @@ class MilaSceneCfg(DroidSceneCfg):
             task,
             task.object_name,
             task.object_prim_path,
-            task.object_init_pos_robot,
-            task.object_init_rot_robot,
+            task.object_init_pos_world,
+            task.object_init_rot_world,
         )
         if task.target_prim_path is not None:
             self._register_rigid_body(
@@ -378,8 +376,8 @@ class MilaSceneCfg(DroidSceneCfg):
                 task,
                 task.target_name,
                 task.target_prim_path,
-                task.target_init_pos_robot,
-                task.target_init_rot_robot,
+                task.target_init_pos_world,
+                task.target_init_rot_world,
             )
 
     def _register_rigid_body(
@@ -388,8 +386,8 @@ class MilaSceneCfg(DroidSceneCfg):
         task: MilaTask,
         alias: str,
         relative_prim_path: str,
-        init_pos_robot: tuple[float, float, float] | None,
-        init_rot_robot: tuple[float, float, float, float] | None,
+        init_pos_world: tuple[float, float, float] | None,
+        init_rot_world: tuple[float, float, float, float] | None,
     ):
         prim = stage.GetPrimAtPath(f"/World/{relative_prim_path}")
         if not prim:
@@ -403,10 +401,10 @@ class MilaSceneCfg(DroidSceneCfg):
         quat = world_transform.ExtractRotationQuat()
         imag = quat.GetImaginary()
         rot = (quat.GetReal(), imag[0], imag[1], imag[2])
-        if init_pos_robot is not None:
-            pos = _transform_pos(task.robot_base_pos, task.robot_base_rot, init_pos_robot)
-        if init_rot_robot is not None:
-            rot = _quat_multiply(task.robot_base_rot, init_rot_robot)
+        if init_pos_world is not None:
+            pos = init_pos_world
+        if init_rot_world is not None:
+            rot = init_rot_world
 
         asset = RigidObjectCfg(
             prim_path=f"{{ENV_REGEX_NS}}/scene/{relative_prim_path}",

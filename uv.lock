@@ -3294,7 +3294,6 @@ dependencies = [
     { name = "mediapy" },
     { name = "openpi-client" },
     { name = "pip" },
-    { name = "pyyaml" },
     { name = "tyro" },
     { name = "websockets" },
 ]
@@ -3305,7 +3304,6 @@ requires-dist = [
     { name = "mediapy", specifier = ">=1.2.4" },
     { name = "openpi-client", git = "https://github.com/Physical-Intelligence/openpi.git?subdirectory=packages%2Fopenpi-client" },
     { name = "pip", specifier = ">=25.0" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "tyro", specifier = ">=0.9.17" },
     { name = "websockets", specifier = ">=16.0" },
 ]

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import math
 from pathlib import Path
-from typing import Any
-
-import yaml
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[4] / "configs" / "mila"
+SCENE_ASSET = "Task1/Scene.usd"
+BASE_SEED = 42
+SUCCESS_HOLD_STEPS = 5
 
 
 @dataclass(frozen=True)
@@ -82,10 +84,10 @@ class MilaTask:
     robot_base_pos: tuple[float, float, float]
     robot_base_rot: tuple[float, float, float, float]
     robot_init_joint_pos: tuple[float, ...]
-    object_init_pos_robot: tuple[float, float, float]
-    object_init_rot_robot: tuple[float, float, float, float]
-    target_init_pos_robot: tuple[float, float, float] | None
-    target_init_rot_robot: tuple[float, float, float, float] | None
+    object_init_pos_world: tuple[float, float, float]
+    object_init_rot_world: tuple[float, float, float, float]
+    target_init_pos_world: tuple[float, float, float] | None
+    target_init_rot_world: tuple[float, float, float, float] | None
     object_spawn_bounds: SpawnBounds | None
     target_spawn_bounds: SpawnBounds | None
     spawn_constraints: tuple[SpawnConstraint, ...]
@@ -111,231 +113,272 @@ class MilaTask:
     in_target_height: float
     in_target_xy_radius: float | None
     release_gripper_threshold: float
-    config_path: Path
+    initial_conditions_file: Path
 
 
-def _mapping(value: Any, field: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{field} must be a mapping")
-    return value
+def _pose(value, field: str):
+    if not isinstance(value, list) or len(value) != 7:
+        raise ValueError(f"{field} must contain [x, y, z, qw, qx, qy, qz]")
+    numbers = tuple(float(item) for item in value)
+    return numbers[:3], numbers[3:]
 
 
-def _vector(value: Any, length: int, field: str) -> tuple[float, ...]:
-    if not isinstance(value, (list, tuple)) or len(value) != length:
-        raise ValueError(f"{field} must contain exactly {length} numbers")
-    result = tuple(float(item) for item in value)
-    return result
+def _initial_conditions(task_id: str, actor_names: tuple[str, ...]):
+    """Load the repository's existing instruction plus finite-pose JSON format."""
+    path = CONFIG_DIR / task_id / "initial_conditions.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    instruction = data.get("instruction")
+    poses = data.get("poses")
+    if not isinstance(instruction, str) or not instruction:
+        raise ValueError(f"{path} must define a non-empty instruction")
+    if not isinstance(poses, list) or len(poses) != 1 or not isinstance(poses[0], dict):
+        raise ValueError(f"{path} must define exactly one nominal pose mapping")
+    if set(poses[0]) != set(actor_names):
+        raise ValueError(f"{path} must define poses for {sorted(actor_names)}")
+    actor_poses = {
+        name: _pose(poses[0][name], f"{path}: poses[0].{name}")
+        for name in actor_names
+    }
+    return instruction, actor_poses, path
 
 
-def _optional_vector(value: Any, length: int, field: str):
-    return None if value is None else _vector(value, length, field)
+EXTERNAL_CAMERA = CameraCfg(
+    inherited=False,
+    pos=(0.17631441295554123, 0.5078738721437033, 0.5882641540000001),
+    rot=(-0.28456424578276596, -0.14125179727209242, 0.4210391071710604, 0.8494099069483977),
+    focal_length=2.1,
+    horizontal_aperture=5.376,
+    vertical_aperture=3.024,
+)
+HOLDER_EXTERNAL_CAMERA = CameraCfg(
+    inherited=False,
+    pos=(0.18134685930269425, 0.6219124578527772, 0.38105248130496585),
+    rot=(-0.28456424578276596, -0.14125179727209242, 0.4210391071710604, 0.8494099069483977),
+    focal_length=2.1,
+    horizontal_aperture=5.376,
+    vertical_aperture=3.024,
+)
+EXTERNAL_CAMERA_2 = CameraCfg(
+    inherited=False,
+    pos=(0.2412851373627978, -0.40400305313882967, 0.5012697904933473),
+    rot=(0.8503307497842424, 0.5093728677822538, -0.06294131031153728, -0.11625602077887143),
+    focal_length=2.1,
+    horizontal_aperture=5.376,
+    vertical_aperture=3.024,
+)
+WRIST_CAMERA = CameraCfg(inherited=True)
+SHARED_DOME_LIGHT = DomeLightCfg(
+    intensity=800.0,
+    color=(0.6988417, 0.6934452, 0.6934452),
+    texture_file="Task1/HDRI004.hdr",
+    visible_in_primary_ray=False,
+)
+SPHERE_LIGHT_OFF = SphereLightCfg(
+    enabled=False,
+    intensity=8500.0,
+    color=(1.0, 0.98, 0.95),
+    radius=0.4,
+    pos=(-1.5, -0.4, 1.6),
+)
 
 
-def _range(value: Any, field: str) -> tuple[float, float]:
-    result = _vector(value, 2, field)
-    if result[0] > result[1]:
-        raise ValueError(f"{field} minimum must not exceed maximum")
-    return result
+sink_instruction, sink_poses, sink_initial_conditions = _initial_conditions(
+    "place_spoon_in_sink", ("spoon",)
+)
+holder_instruction, holder_poses, holder_initial_conditions = _initial_conditions(
+    "place_spoon_in_utensil_holder", ("spoon", "utensil_holder")
+)
+bowl_instruction, bowl_poses, bowl_initial_conditions = _initial_conditions(
+    "stack_red_bowl_into_grey_bowl", ("red_bowl", "grey_bowl")
+)
 
 
-def _spawn_bounds(raw: Any, field: str) -> SpawnBounds | None:
-    if raw is None:
-        return None
-    data = _mapping(raw, field)
-    translation = _mapping(data.get("translation_m", {}), f"{field}.translation_m")
-    yaw_degrees = _range(data.get("yaw_deg", (0.0, 0.0)), f"{field}.yaw_deg")
-    degrees_to_radians = 3.141592653589793 / 180.0
-    return SpawnBounds(
-        x=_range(translation.get("x", (0.0, 0.0)), f"{field}.translation_m.x"),
-        y=_range(translation.get("y", (0.0, 0.0)), f"{field}.translation_m.y"),
-        yaw=(yaw_degrees[0] * degrees_to_radians, yaw_degrees[1] * degrees_to_radians),
-    )
-
-
-def _constraint(raw: Any, field: str) -> SpawnConstraint:
-    data = _mapping(raw, field)
-    kind = str(data["type"])
-    assets = _vector_names(data.get("assets"), 2, f"{field}.assets")
-    if kind == "minimum_planar_distance":
-        return SpawnConstraint(
-            kind=kind,
-            asset_a=assets[0],
-            asset_b=assets[1],
-            minimum_distance=float(data["minimum_distance_m"]),
-        )
-    if kind == "segment_circle_clearance":
-        points = data.get("segment_points_local_m")
-        if not isinstance(points, list) or len(points) != 2:
-            raise ValueError(f"{field}.segment_points_local_m must contain two points")
-        return SpawnConstraint(
-            kind=kind,
-            asset_a=assets[0],
-            asset_b=assets[1],
-            asset_a_points=tuple(
-                _vector(point, 3, f"{field}.segment_points_local_m") for point in points
+MILA_TASKS = {
+    "place_spoon_in_sink": MilaTask(
+        institution="MILA",
+        task_id="place_spoon_in_sink",
+        scene_asset=SCENE_ASSET,
+        language_instruction=sink_instruction,
+        success_criteria="The spoon ends up lying flat in the sink and the gripper releases it.",
+        max_timesteps=300,
+        seed=BASE_SEED,
+        success_hold_steps=SUCCESS_HOLD_STEPS,
+        milestones=(
+            Milestone("reached_spoon", "Gripper made contact with the spoon."),
+            Milestone("lifted_up_spoon", "Spoon was lifted clearly off the countertop."),
+            Milestone("above_sink", "The majority of the spoon was moved above the sink region before final placement."),
+            Milestone("completely_in_sink", "Spoon ends up completely in the sink and the gripper releases it."),
+        ),
+        final_milestone="completely_in_sink",
+        object_name="spoon",
+        target_name="sink",
+        object_prim_path="Spoon054/Spoon054",
+        target_prim_path=None,
+        robot_base_pos=(-1.0184789338318788, -0.8314798528096464, 0.806119064555536),
+        robot_base_rot=(0.0, 0.0, 0.0, 1.0),
+        robot_init_joint_pos=(0.00112558354, -0.609502673, 0.000848179392, -2.50074935, -0.0229695588, 1.89955163, -0.0205767453),
+        object_init_pos_world=sink_poses["spoon"][0],
+        object_init_rot_world=sink_poses["spoon"][1],
+        target_init_pos_world=None,
+        target_init_rot_world=None,
+        object_spawn_bounds=SpawnBounds(y=(-0.07, 0.07), yaw=(-math.pi, math.pi)),
+        target_spawn_bounds=None,
+        spawn_constraints=(),
+        cameras={"external_cam": EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
+        dome_light=SHARED_DOME_LIGHT,
+        sphere_light=SPHERE_LIGHT_OFF,
+        fixed_target_pos_robot=(0.4756867334943357, 0.2833240761550858, -0.0002414716808392),
+        fixed_target_rot_robot=(0.7071067811865476, 0.0, 0.0, -0.7071067811865475),
+        hidden_prim_paths=("Bowl060", "Bowl061", "Bowl062", "CannedFood048", "Cup082", "TeaBox001"),
+        target_top_center=(0.0, 0.0, 0.10113153606653214),
+        target_bottom_center=(0.0, 0.0, -0.10113153606653214),
+        object_bottom_center=None,
+        object_mouth_center=None,
+        object_region_points=((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
+        target_region_prim_path="Sink003/Sink003/Sites/reg_basin",
+        target_region_extent_min=(-0.17917540669441223, -0.15094169974327087, -0.10113153606653214),
+        target_region_extent_max=(0.17917540669441223, 0.15094169974327087, 0.10113153606653214),
+        target_region_tolerance=0.0,
+        reach_distance=0.20,
+        lift_height=0.05,
+        target_xy_radius=0.10,
+        above_target_height=0.08,
+        in_target_height=0.05,
+        in_target_xy_radius=0.15,
+        release_gripper_threshold=0.5,
+        initial_conditions_file=sink_initial_conditions,
+    ),
+    "place_spoon_in_utensil_holder": MilaTask(
+        institution="MILA",
+        task_id="place_spoon_in_utensil_holder",
+        scene_asset=SCENE_ASSET,
+        language_instruction=holder_instruction,
+        success_criteria="The spoon ends up in the utensil holder, the gripper releases it, and the holder remains upright.",
+        max_timesteps=400,
+        seed=BASE_SEED,
+        success_hold_steps=SUCCESS_HOLD_STEPS,
+        milestones=(
+            Milestone("reached_spoon", "Gripper made contact with the spoon."),
+            Milestone("lifted_up_spoon", "Spoon was lifted clearly off the countertop."),
+            Milestone("above_utensil_holder", "The spoon's insertion end was moved above or into the holder region."),
+            Milestone("released_in_utensil_holder", "Spoon is inside the upright holder and the gripper releases it."),
+        ),
+        final_milestone="released_in_utensil_holder",
+        object_name="spoon",
+        target_name="utensil_holder",
+        object_prim_path="Spoon054/Spoon054",
+        target_prim_path="Bowl060/Bowl060",
+        robot_base_pos=(-0.9930789338318788, -0.5520798528096464, 0.9144153361701479),
+        robot_base_rot=(0.0, 0.0, 0.0, 1.0),
+        robot_init_joint_pos=(0.01643991, -0.59407169, -0.01652975, -2.50808907, -0.02607333, 1.91518295, -0.0163574),
+        object_init_pos_world=holder_poses["spoon"][0],
+        object_init_rot_world=holder_poses["spoon"][1],
+        target_init_pos_world=holder_poses["utensil_holder"][0],
+        target_init_rot_world=holder_poses["utensil_holder"][1],
+        object_spawn_bounds=SpawnBounds(y=(-0.15, 0.0), yaw=(-math.pi, math.pi)),
+        target_spawn_bounds=None,
+        spawn_constraints=(
+            SpawnConstraint(
+                kind="segment_circle_clearance",
+                asset_a="spoon",
+                asset_b="utensil_holder",
+                asset_a_points=((0.0, -0.18, 0.0), (0.0, 0.18, 0.0)),
+                asset_b_radius=0.07,
+                clearance=0.01,
             ),
-            asset_b_radius=float(data["circle_radius_m"]),
-            clearance=float(data.get("clearance_m", 0.0)),
-        )
-    raise ValueError(f"Unsupported spawn constraint type: {kind}")
-
-
-def _vector_names(value: Any, length: int, field: str) -> tuple[str, ...]:
-    if not isinstance(value, (list, tuple)) or len(value) != length:
-        raise ValueError(f"{field} must contain exactly {length} asset names")
-    return tuple(str(item) for item in value)
-
-
-def _camera(raw: Any, field: str) -> CameraCfg:
-    data = _mapping(raw, field)
-    inherited = bool(data.get("inherited", False))
-    if inherited:
-        return CameraCfg(inherited=True)
-    return CameraCfg(
-        inherited=False,
-        pos=_vector(data["pos_robot"], 3, f"{field}.pos_robot"),
-        rot=_vector(data["rot_wxyz_robot"], 4, f"{field}.rot_wxyz_robot"),
-        focal_length=float(data["focal_length"]),
-        horizontal_aperture=float(data["horizontal_aperture"]),
-        vertical_aperture=float(data["vertical_aperture"]),
-    )
-
-
-def load_mila_task(path: str | Path) -> MilaTask:
-    config_path = Path(path).resolve()
-    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    data = _mapping(raw, str(config_path))
-    if data.get("schema_version") != 1:
-        raise ValueError(f"Unsupported MILA config schema in {config_path}")
-    if data.get("randomization_scope") != "movable_task_objects_only":
-        raise ValueError(f"{config_path} must use movable_task_objects_only randomization")
-
-    robot = _mapping(data["robot"], "robot")
-    actors = _mapping(data["actors"], "actors")
-    object_data = _mapping(actors["object"], "actors.object")
-    target_data = _mapping(actors["target"], "actors.target")
-    randomization = _mapping(data["randomization"], "randomization")
-    random_assets = _mapping(randomization.get("assets", {}), "randomization.assets")
-    geometry = _mapping(data.get("geometry", {}), "geometry")
-    thresholds = _mapping(data["thresholds"], "thresholds")
-    lighting = _mapping(data["lighting"], "lighting")
-    dome = _mapping(lighting["dome"], "lighting.dome")
-    sphere = _mapping(lighting["sphere"], "lighting.sphere")
-    camera_data = _mapping(data["cameras"], "cameras")
-    milestones = tuple(
-        Milestone(name=str(item["name"]), description=str(item["description"]))
-        for item in data["milestones"]
-    )
-    milestone_names = tuple(item.name for item in milestones)
-    final_milestone = str(data["final_milestone"])
-    if not milestones or len(milestone_names) != len(set(milestone_names)):
-        raise ValueError(f"{config_path} must define unique milestones")
-    if final_milestone != milestone_names[-1]:
-        raise ValueError(f"{config_path} final_milestone must be the final ordered milestone")
-
-    object_name = str(object_data["name"])
-    target_name = str(target_data["name"])
-    allowed_assets = {object_name, target_name}
-    unknown_random_assets = set(random_assets) - allowed_assets
-    if unknown_random_assets:
-        raise ValueError(f"Unknown randomized assets in {config_path}: {sorted(unknown_random_assets)}")
-
-    cameras = {name: _camera(item, f"cameras.{name}") for name, item in camera_data.items()}
-    if set(cameras) != {"external_cam", "external_cam_2", "wrist_cam"}:
-        raise ValueError(f"{config_path} must configure exactly the three MILA cameras")
-
-    task = MilaTask(
-        institution=str(data["institution"]),
-        task_id=str(data["task_id"]),
-        scene_asset=str(data["scene_asset"]),
-        language_instruction=str(data["language_instruction"]),
-        success_criteria=str(data["success_criteria"]),
-        max_timesteps=int(data["max_timesteps"]),
-        seed=int(data["seed"]),
-        success_hold_steps=int(data["success_hold_steps"]),
-        milestones=milestones,
-        final_milestone=final_milestone,
-        object_name=object_name,
-        target_name=target_name,
-        object_prim_path=str(object_data["prim_path"]),
-        target_prim_path=(None if target_data.get("prim_path") is None else str(target_data["prim_path"])),
-        robot_base_pos=_vector(robot["base_pos_world"], 3, "robot.base_pos_world"),
-        robot_base_rot=_vector(robot["base_rot_wxyz_world"], 4, "robot.base_rot_wxyz_world"),
-        robot_init_joint_pos=_vector(robot["init_joint_pos"], 7, "robot.init_joint_pos"),
-        object_init_pos_robot=_vector(object_data["nominal_pos_robot"], 3, "actors.object.nominal_pos_robot"),
-        object_init_rot_robot=_vector(object_data["nominal_rot_wxyz_robot"], 4, "actors.object.nominal_rot_wxyz_robot"),
-        target_init_pos_robot=_optional_vector(target_data.get("nominal_pos_robot"), 3, "actors.target.nominal_pos_robot"),
-        target_init_rot_robot=_optional_vector(target_data.get("nominal_rot_wxyz_robot"), 4, "actors.target.nominal_rot_wxyz_robot"),
-        object_spawn_bounds=_spawn_bounds(random_assets.get(object_name), f"randomization.assets.{object_name}"),
-        target_spawn_bounds=_spawn_bounds(random_assets.get(target_name), f"randomization.assets.{target_name}"),
-        spawn_constraints=tuple(
-            _constraint(item, f"randomization.constraints[{index}]")
-            for index, item in enumerate(randomization.get("constraints", []))
         ),
-        cameras=cameras,
-        dome_light=DomeLightCfg(
-            intensity=float(dome["intensity"]),
-            color=_vector(dome["color"], 3, "lighting.dome.color"),
-            texture_file=str(dome["texture_file"]),
-            visible_in_primary_ray=bool(dome["visible_in_primary_ray"]),
-        ),
+        cameras={"external_cam": HOLDER_EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
+        dome_light=SHARED_DOME_LIGHT,
         sphere_light=SphereLightCfg(
-            enabled=bool(sphere["enabled"]),
-            intensity=float(sphere["intensity"]),
-            color=_vector(sphere["color"], 3, "lighting.sphere.color"),
-            radius=float(sphere["radius"]),
-            pos=_vector(sphere["pos_world"], 3, "lighting.sphere.pos_world"),
+            enabled=True,
+            intensity=8500.0,
+            color=(1.0, 0.98, 0.95),
+            radius=0.4,
+            pos=(-1.3535490247772108, -0.828725046255258, 1.6),
         ),
-        fixed_target_pos_robot=_optional_vector(geometry.get("fixed_target_pos_robot"), 3, "geometry.fixed_target_pos_robot"),
-        fixed_target_rot_robot=_vector(geometry.get("fixed_target_rot_wxyz_robot", (1.0, 0.0, 0.0, 0.0)), 4, "geometry.fixed_target_rot_wxyz_robot"),
-        hidden_prim_paths=tuple(str(item) for item in data.get("hidden_prim_paths", [])),
-        target_top_center=_optional_vector(geometry.get("target_top_center"), 3, "geometry.target_top_center"),
-        target_bottom_center=_optional_vector(geometry.get("target_bottom_center"), 3, "geometry.target_bottom_center"),
-        object_bottom_center=_optional_vector(geometry.get("object_bottom_center"), 3, "geometry.object_bottom_center"),
-        object_mouth_center=_optional_vector(geometry.get("object_mouth_center"), 3, "geometry.object_mouth_center"),
-        object_region_points=tuple(
-            _vector(point, 3, f"geometry.object_region_points[{index}]")
-            for index, point in enumerate(geometry.get("object_region_points", []))
+        fixed_target_pos_robot=None,
+        fixed_target_rot_robot=(1.0, 0.0, 0.0, 0.0),
+        hidden_prim_paths=("Bowl061", "Bowl062", "CannedFood048", "Cup082", "TeaBox001"),
+        target_top_center=(0.0, 0.0, 0.2589967),
+        target_bottom_center=(0.0, 0.0, -0.08577694),
+        object_bottom_center=(0.0, -0.18, 0.0),
+        object_mouth_center=None,
+        object_region_points=(),
+        target_region_prim_path="Bowl060/Bowl060/Sites/bowl_liquid",
+        target_region_extent_min=(-0.05687966, -0.06451707, -0.07497805),
+        target_region_extent_max=(0.05687965, 0.04574309, 0.06924114),
+        target_region_tolerance=0.01,
+        reach_distance=0.20,
+        lift_height=0.05,
+        target_xy_radius=0.05,
+        above_target_height=0.08,
+        in_target_height=0.05,
+        in_target_xy_radius=0.05,
+        release_gripper_threshold=0.5,
+        initial_conditions_file=holder_initial_conditions,
+    ),
+    "stack_red_bowl_into_grey_bowl": MilaTask(
+        institution="MILA",
+        task_id="stack_red_bowl_into_grey_bowl",
+        scene_asset=SCENE_ASSET,
+        language_instruction=bowl_instruction,
+        success_criteria="The red bowl ends up inside the grey bowl and the gripper releases it.",
+        max_timesteps=600,
+        seed=BASE_SEED,
+        success_hold_steps=SUCCESS_HOLD_STEPS,
+        milestones=(
+            Milestone("reached_red_bowl", "Gripper made contact with the red bowl."),
+            Milestone("lifted_up_red_bowl", "Red bowl was lifted clearly off the countertop."),
+            Milestone("above_grey_bowl", "Red bowl was lifted above and aligned with the grey bowl."),
+            Milestone("placed_in_grey_bowl", "Red bowl is contained inside the grey bowl and the gripper releases it."),
         ),
-        target_region_prim_path=(None if geometry.get("target_region_prim_path") is None else str(geometry["target_region_prim_path"])),
-        target_region_extent_min=_optional_vector(geometry.get("target_region_extent_min"), 3, "geometry.target_region_extent_min"),
-        target_region_extent_max=_optional_vector(geometry.get("target_region_extent_max"), 3, "geometry.target_region_extent_max"),
-        target_region_tolerance=float(geometry.get("target_region_tolerance", 0.01)),
-        reach_distance=float(thresholds["reach_distance"]),
-        lift_height=float(thresholds["lift_height"]),
-        target_xy_radius=float(thresholds["target_xy_radius"]),
-        above_target_height=float(thresholds["above_target_height"]),
-        in_target_height=float(thresholds["in_target_height"]),
-        in_target_xy_radius=(None if thresholds.get("in_target_xy_radius") is None else float(thresholds["in_target_xy_radius"])),
-        release_gripper_threshold=float(thresholds["release_gripper_threshold"]),
-        config_path=config_path,
-    )
-    if task.seed != 42:
-        raise ValueError(f"{config_path} must use the approved base seed 42")
-    if task.success_hold_steps < 1:
-        raise ValueError(f"{config_path} success_hold_steps must be positive")
-    if task.scene_asset != "Task1/Scene.usd":
-        raise ValueError(f"{config_path} must use the replacement Task1 scene")
-    for constraint in task.spawn_constraints:
-        if constraint.asset_a not in allowed_assets or constraint.asset_b not in allowed_assets:
-            raise ValueError(f"Unknown constrained asset in {config_path}: {constraint}")
-    return task
-
-
-def load_mila_tasks(config_dir: str | Path = CONFIG_DIR) -> dict[str, MilaTask]:
-    directory = Path(config_dir)
-    tasks: dict[str, MilaTask] = {}
-    for path in sorted(directory.glob("*.yaml")):
-        task = load_mila_task(path)
-        if task.task_id in tasks:
-            raise ValueError(f"Duplicate MILA task ID: {task.task_id}")
-        tasks[task.task_id] = task
-    if not tasks:
-        raise ValueError(f"No MILA task YAML files found in {directory}")
-    return tasks
-
-
-MILA_TASKS = load_mila_tasks()
+        final_milestone="placed_in_grey_bowl",
+        object_name="red_bowl",
+        target_name="grey_bowl",
+        object_prim_path="Bowl061/Bowl061",
+        target_prim_path="Bowl062/Bowl062",
+        robot_base_pos=(-1.0184789338318788, -0.5012798528096464, 0.831519064555536),
+        robot_base_rot=(0.0, 0.0, 0.0, 1.0),
+        robot_init_joint_pos=(0.00500921, -0.60578179, 0.00545613, -2.52051044, -0.02542639, 1.91960347, 0.03166837),
+        object_init_pos_world=bowl_poses["red_bowl"][0],
+        object_init_rot_world=bowl_poses["red_bowl"][1],
+        target_init_pos_world=bowl_poses["grey_bowl"][0],
+        target_init_rot_world=bowl_poses["grey_bowl"][1],
+        object_spawn_bounds=SpawnBounds(y=(0.0, 0.15)),
+        target_spawn_bounds=SpawnBounds(x=(-0.10, 0.10), y=(0.0, 0.166)),
+        spawn_constraints=(
+            SpawnConstraint(
+                kind="minimum_planar_distance",
+                asset_a="red_bowl",
+                asset_b="grey_bowl",
+                minimum_distance=0.191,
+            ),
+        ),
+        cameras={"external_cam": EXTERNAL_CAMERA, "external_cam_2": EXTERNAL_CAMERA_2, "wrist_cam": WRIST_CAMERA},
+        dome_light=SHARED_DOME_LIGHT,
+        sphere_light=SPHERE_LIGHT_OFF,
+        fixed_target_pos_robot=None,
+        fixed_target_rot_robot=(1.0, 0.0, 0.0, 0.0),
+        hidden_prim_paths=("Bowl060", "CannedFood048", "Cup082", "Spoon054", "TeaBox001"),
+        target_top_center=None,
+        target_bottom_center=(0.0, 0.0, -0.040000003),
+        object_bottom_center=(0.0, 0.0, -0.029655244),
+        object_mouth_center=(0.0, 0.0, 0.029655248),
+        object_region_points=(),
+        target_region_prim_path="Bowl062/Bowl062/Sites/bowl_liquid",
+        target_region_extent_min=(-0.089, -0.089, -0.034),
+        target_region_extent_max=(0.089, 0.089, 0.034),
+        target_region_tolerance=0.01,
+        reach_distance=0.12,
+        lift_height=0.05,
+        target_xy_radius=0.10,
+        above_target_height=0.08,
+        in_target_height=0.08,
+        in_target_xy_radius=None,
+        release_gripper_threshold=0.5,
+        initial_conditions_file=bowl_initial_conditions,
+    ),
+}
 
 
 def get_mila_task(task_id: str) -> MilaTask:
@@ -343,4 +386,6 @@ def get_mila_task(task_id: str) -> MilaTask:
         return MILA_TASKS[task_id]
     except KeyError as exc:
         supported_tasks = ", ".join(sorted(MILA_TASKS))
-        raise ValueError(f"Unsupported MILA task '{task_id}'. Supported tasks: {supported_tasks}") from exc
+        raise ValueError(
+            f"Unsupported MILA task '{task_id}'. Supported tasks: {supported_tasks}"
+        ) from exc

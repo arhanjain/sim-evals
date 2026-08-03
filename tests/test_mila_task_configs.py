@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import ast
+import json
 import math
 import sys
 import unittest
 from pathlib import Path
-
-import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,7 +28,7 @@ class MilaTaskConfigTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.module = _load_tasks_module()
-        cls.tasks = cls.module.load_mila_tasks(ROOT / "configs" / "mila")
+        cls.tasks = cls.module.MILA_TASKS
 
     def test_all_tasks_use_replacement_scene_and_seed_42(self):
         self.assertEqual(
@@ -74,11 +73,29 @@ class MilaTaskConfigTest(unittest.TestCase):
         self.assertEqual(bowls.target_spawn_bounds.yaw, (0.0, 0.0))
         self.assertEqual(bowls.spawn_constraints[0].kind, "minimum_planar_distance")
 
-        for path in (ROOT / "configs" / "mila").glob("*.yaml"):
-            raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-            self.assertEqual(raw["randomization_scope"], "movable_task_objects_only")
-            self.assertNotIn("robot", raw["randomization"])
-            self.assertNotIn("cameras", raw["randomization"])
+    def test_initial_conditions_use_existing_json_contract(self):
+        for task in self.tasks.values():
+            path = task.initial_conditions_file
+            self.assertEqual(path.name, "initial_conditions.json")
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(set(raw), {"instruction", "poses"})
+            self.assertEqual(raw["instruction"], task.language_instruction)
+            self.assertEqual(len(raw["poses"]), 1)
+            self.assertEqual(
+                set(raw["poses"][0]),
+                {task.object_name}
+                | ({task.target_name} if task.target_prim_path is not None else set()),
+            )
+            for pose in raw["poses"][0].values():
+                self.assertEqual(len(pose), 7)
+
+            object_pose = raw["poses"][0][task.object_name]
+            self.assertEqual(tuple(object_pose[:3]), task.object_init_pos_world)
+            self.assertEqual(tuple(object_pose[3:]), task.object_init_rot_world)
+            if task.target_prim_path is not None:
+                target_pose = raw["poses"][0][task.target_name]
+                self.assertEqual(tuple(target_pose[:3]), task.target_init_pos_world)
+                self.assertEqual(tuple(target_pose[3:]), task.target_init_rot_world)
 
     def test_sphere_light_is_enabled_only_for_spoon_in_cup(self):
         enabled_tasks = {
@@ -125,11 +142,11 @@ class MilaTaskConfigTest(unittest.TestCase):
         bowls = self.tasks["stack_red_bowl_into_grey_bowl"]
         self.assertAlmostEqual(bowls.robot_base_pos[2], 0.831519064555536)
         self.assertAlmostEqual(
-            bowls.robot_base_pos[2] + bowls.object_init_pos_robot[2],
+            bowls.object_init_pos_world[2],
             0.9007219075693947,
         )
         self.assertAlmostEqual(
-            bowls.robot_base_pos[2] + bowls.target_init_pos_robot[2],
+            bowls.target_init_pos_world[2],
             0.9111174353900667,
         )
 
