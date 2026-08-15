@@ -51,7 +51,7 @@ def main(
 
     # All IsaacLab dependent modules should be imported after the app is launched
     import sim_evals.environments # noqa: F401
-    from sim_evals.environments.droid_environment import get_scene_spec
+    from sim_evals.environments.droid import get_scene_spec
     from isaaclab_tasks.utils import parse_env_cfg
 
     scene_spec = get_scene_spec(environment)
