@@ -91,6 +91,16 @@ class MilaTask:
     in_target_xy_radius: float | None
     release_gripper_threshold: float
     initial_conditions_file: Path
+    # Success-criteria selectors (previously hardcoded via ``task_id`` string
+    # comparisons in the reward code). ``containment_uses_object_point`` places
+    # the object's ``object_bottom_center`` point into the target region -- and,
+    # when ``release_requires_upright`` is set, additionally requires the target
+    # to stay upright within ``target_upright_min_z`` -- instead of the default
+    # surface-overlap check. Region-point release is selected by a non-empty
+    # ``object_region_points`` and needs no flag.
+    containment_uses_object_point: bool = False
+    release_requires_upright: bool = False
+    target_upright_min_z: float = 0.9
 
 
 def _pose(value, field: str):
@@ -285,6 +295,8 @@ MILA_TASKS = {
         in_target_xy_radius=0.05,
         release_gripper_threshold=0.5,
         initial_conditions_file=holder_initial_conditions,
+        containment_uses_object_point=True,
+        release_requires_upright=True,
     ),
     "stack_red_bowl_into_grey_bowl": MilaTask(
         institution="MILA",

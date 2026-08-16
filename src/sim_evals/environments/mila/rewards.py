@@ -148,7 +148,7 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
     object_inside_target_region = object_keypoints_inside_target_region(env, task)
     above_holder = above_target_surface
     released_in_holder = in_target_surface
-    if task.task_id == "place_spoon_in_utensil_holder" and task.object_bottom_center is not None:
+    if task.containment_uses_object_point and task.object_bottom_center is not None:
         above_holder = object_point_above_or_inside_target_region(
             env,
             task,
@@ -157,10 +157,13 @@ def _milestone_checks(env: ManagerBasedRLEnv, task_id: str) -> dict[str, torch.T
         released_in_holder = (
             object_point_inside_target_region(env, task, task.object_bottom_center)
             & gripper_open
-            & target_is_upright(env)
         )
+        if task.release_requires_upright:
+            released_in_holder = released_in_holder & target_is_upright(
+                env, task.target_upright_min_z
+            )
     released_in_sink = in_target_surface
-    if task.task_id == "place_spoon_in_sink" and task.object_region_points:
+    if task.object_region_points:
         released_in_sink = object_inside_target_region & gripper_open
 
     return {

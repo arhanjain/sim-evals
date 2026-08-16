@@ -96,6 +96,31 @@ class MilaTaskConfigTest(unittest.TestCase):
         )
         self.assertEqual(sink.target_region_prim_path, "Sink003/Sink003/Sites/reg_basin")
 
+    def test_placement_flags_replace_legacy_task_id_branches(self):
+        """The success-criteria config must reproduce the old task_id branches.
+
+        Previously ``rewards._milestone_checks`` selected placement semantics by
+        comparing ``task.task_id`` to string literals; that logic now reads these
+        flags, so their per-task values must match the legacy branch conditions.
+        """
+        sink = self.tasks["place_spoon_in_sink"]
+        holder = self.tasks["place_spoon_in_utensil_holder"]
+        bowl = self.tasks["stack_red_bowl_into_grey_bowl"]
+
+        # Only the utensil-holder task used the object-point / upright branch.
+        self.assertTrue(holder.containment_uses_object_point)
+        self.assertTrue(holder.release_requires_upright)
+        self.assertEqual(holder.target_upright_min_z, 0.9)
+        for task in (sink, bowl):
+            self.assertFalse(task.containment_uses_object_point)
+            self.assertFalse(task.release_requires_upright)
+
+        # The sink branch is now keyed off object_region_points, which is
+        # non-empty for the sink task alone.
+        self.assertTrue(bool(sink.object_region_points))
+        self.assertFalse(bool(holder.object_region_points))
+        self.assertFalse(bool(bowl.object_region_points))
+
     def test_initial_conditions_use_existing_json_contract(self):
         for task in self.tasks.values():
             path = task.initial_conditions_file
