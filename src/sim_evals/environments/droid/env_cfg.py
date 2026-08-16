@@ -221,6 +221,11 @@ class DroidEnvCfg(ManagerBasedRLEnvCfg):
     events = EventCfg()
     curriculum = CurriculumCfg()
 
+    # Name of the ``policy`` observation the inference client feeds as the
+    # exterior view. Scenes whose primary external camera is repositioned (e.g.
+    # MILA) override this in their ``set_*`` method.
+    policy_external_camera: str = "external_cam"
+
     def __post_init__(self):
         self.episode_length_s = 30
 

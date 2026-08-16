@@ -6,5 +6,6 @@ effect. Import it (``import sim_evals.environments``) before calling
 """
 
 from . import droid  # noqa: F401  (registers the DROID scenes on import)
+from . import mila  # noqa: F401  (registers the MILA parity tasks on import)
 
-__all__ = ["droid"]
+__all__ = ["droid", "mila"]
