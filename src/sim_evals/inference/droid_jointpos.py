@@ -6,12 +6,14 @@ from openpi_client import websocket_client_policy, image_tools
 from .abstract_client import InferenceClient
 
 class Client(InferenceClient):
-    def __init__(self, 
-                remote_host:str = "localhost", 
+    def __init__(self,
+                remote_host:str = "localhost",
                 remote_port:int = 8000,
                 open_loop_horizon:int = 8,
+                external_camera: str = "external_cam",
                  ) -> None:
         self.open_loop_horizon = open_loop_horizon
+        self.external_camera = external_camera
         self.client = websocket_client_policy.WebsocketClientPolicy(
             remote_host, remote_port
         )
@@ -73,8 +75,15 @@ class Client(InferenceClient):
 
     def _extract_observation(self, obs_dict, *, save_to_disk=False):
         # Assign images
-        right_image = obs_dict["policy"]["external_cam"][0].clone().detach().cpu().numpy()
-        wrist_image = obs_dict["policy"]["wrist_cam"][0].clone().detach().cpu().numpy()
+        policy_obs = obs_dict["policy"]
+        if self.external_camera not in policy_obs:
+            supported = ", ".join(sorted(policy_obs))
+            raise KeyError(
+                f"Policy observation does not contain external camera "
+                f"'{self.external_camera}'. Available observations: {supported}"
+            )
+        right_image = policy_obs[self.external_camera][0].clone().detach().cpu().numpy()
+        wrist_image = policy_obs["wrist_cam"][0].clone().detach().cpu().numpy()
 
         # Capture proprioceptive state
         robot_state = obs_dict["policy"]

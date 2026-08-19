@@ -17,7 +17,7 @@ Finally, run the evaluation script:
 
 python run_eval.py --episodes 10 --headless
 python run_eval.py --episodes 10 --environment DROID-CanInMug --headless
-python run_eval.py --episodes 10 --environment DROID-MILA-Task1 --instruction "Pick up the spoon and place it in the sink." --headless
+python run_eval.py --episodes 10 --environment DROID-MILA-place_spoon_in_sink --headless
 """
 
 import tyro
@@ -51,12 +51,11 @@ def main(
 
     # All IsaacLab dependent modules should be imported after the app is launched
     import sim_evals.environments # noqa: F401
-    from sim_evals.environments.droid import get_scene_spec
     from isaaclab_tasks.utils import parse_env_cfg
 
-    scene_spec = get_scene_spec(environment)
-
-    # Initialize the env
+    # Initialize the env. The registered factory composes the scene/task overlay
+    # onto the base cfg, so the instruction and policy camera come straight off
+    # the resulting cfg -- no per-environment special-casing here.
     env_cfg = parse_env_cfg(
         environment,
         device=args_cli.device,
@@ -64,12 +63,17 @@ def main(
         use_fabric=True,
     )
 
-    policy_instruction = instruction or getattr(env_cfg, "language_instruction", scene_spec.instruction)
+    policy_instruction = instruction or getattr(env_cfg, "language_instruction", None)
+    if policy_instruction is None:
+        raise ValueError(
+            f"No instruction available for {environment!r}; pass --instruction."
+        )
+    external_camera = getattr(env_cfg, "policy_external_camera", "external_cam")
     env = gym.make(environment, cfg=env_cfg)
 
     obs, _ = env.reset()
     obs, _ = env.reset() # need second render cycle to get correctly loaded materials
-    client = DroidJointPosClient()
+    client = DroidJointPosClient(external_camera=external_camera)
 
 
     video_dir = Path("runs") / datetime.now().strftime("%Y-%m-%d") / datetime.now().strftime("%H-%M-%S")

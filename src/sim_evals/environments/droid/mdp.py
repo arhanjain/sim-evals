@@ -5,12 +5,16 @@ Holds the project-specific observation functions and action term used by
 (images, resets, time-outs, ...) are used directly from ``isaaclab.envs.mdp``.
 """
 
+import json
+
 import numpy as np
 import torch
 
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
+from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ManagerTermBase
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 
@@ -78,3 +82,61 @@ class BinaryJointPositionZeroToOneActionCfg(BinaryJointPositionActionCfg):
     """
 
     class_type = BinaryJointPositionZeroToOneAction
+
+
+class reset_initial_conditions(ManagerTermBase):
+    """Reset event term that cycles through a fixed set of scene poses.
+
+    The ``initial_conditions_file`` is a JSON document with a ``"poses"`` list;
+    each entry maps an object name in the scene to a ``[x, y, z, qw, qx, qy, qz]``
+    world pose. On every reset the term deals the next pose set (round-robin) to
+    the environments being reset and writes the root poses to the sim, offset by
+    each environment's origin. This makes evaluation deterministic and
+    reproducible instead of relying on runtime randomisation.
+    """
+
+    def __init__(self, cfg: EventTerm, env: ManagerBasedRLEnv):
+        initial_conditions_file = cfg.params.get("initial_conditions_file", [])
+
+        with open(initial_conditions_file, "r") as f:
+            self.initial_conditions = json.load(f)["poses"]
+
+        self.current_index = 0
+        super().__init__(cfg, env)
+
+    def __call__(self, env: ManagerBasedRLEnv, env_ids, initial_conditions_file: str):
+        if len(self.initial_conditions) == 0:
+            print("No initial conditions found. Objects will be reset to default poses.")
+            return
+
+        # Ensure env_ids is a tensor
+        if not isinstance(env_ids, torch.Tensor):
+            env_ids = torch.tensor(env_ids, device=env.device)
+        num_resets = len(env_ids)
+
+        # Get ICs for each env being reset
+        ic_indices = [
+            (self.current_index + i) % len(self.initial_conditions)
+            for i in range(num_resets)
+        ]
+        print(f"Resetting envs {env_ids.cpu().tolist()} to initial conditions {ic_indices}")
+
+        # Get env origins for all envs being reset
+        env_origins = env.scene.env_origins[env_ids]  # (num_resets, 3)
+
+        # Collect all object names (assume all ICs have same objects)
+        obj_names = list(self.initial_conditions[0].keys())
+
+        # Batch write per object
+        for obj in obj_names:
+            poses = []
+            for i in range(num_resets):
+                pose = self.initial_conditions[ic_indices[i]][obj]
+                poses.append(pose)
+            poses = torch.tensor(poses, device=env.device)  # (num_resets, 7)
+            # Add env origin offset to positions
+            poses[:, :3] += env_origins
+            env.scene[obj].write_root_pose_to_sim(poses, env_ids=env_ids)
+
+        # Advance counter by number of envs reset
+        self.current_index += num_resets
